@@ -12,15 +12,25 @@
     .user-box { display: flex; align-items: center; gap: 10px; }
     .avatar { width: 36px; height: 36px; border-radius: 50%; background: #444; object-fit: cover; display: flex; align-items: center; justify-content: center; font-size: 18px; }
     button { cursor: pointer; border: none; padding: 8px 16px; border-radius: 6px; font-weight: bold; background: #0088cc; color: white; }
+    button.spectate-btn { background: #4a148c; }
     button:disabled { opacity: 0.5; cursor: not-allowed; }
 
     .card-panel { max-width: 800px; margin: 0 auto; background: #203a43; padding: 20px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
     
-    /* 部屋リスト・作成フォーム */
-    .lobby { display: flex; flex-direction: column; gap: 15px; max-width: 400px; margin: 0 auto; }
-    .input-group { display: flex; flex-direction: column; gap: 8px; text-align: left; }
-    input, select { padding: 10px; border-radius: 6px; border: 1px solid #444; background: #2c5364; color: white; }
+    /* レイアウト：左側作成、右側部屋リスト */
+    .lobby-container { display: flex; gap: 20px; text-align: left; }
+    .lobby-box { flex: 1; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 12px; }
     
+    .input-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+    input, select { padding: 10px; border-radius: 6px; border: 1px solid #444; background: #2c5364; color: white; width: 100%; }
+    
+    /* 部屋カードアイテム */
+    .room-item { background: #2c5364; padding: 12px; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+    .room-info { display: flex; flex-direction: column; gap: 4px; }
+    .room-name { font-weight: bold; font-size: 16px; }
+    .room-meta { font-size: 12px; color: #b0bec5; }
+    .room-actions { display: flex; gap: 6px; }
+
     /* ゲーム画面 */
     .game-board { display: none; margin-top: 20px; }
     .status-bar { font-size: 18px; font-weight: bold; margin-bottom: 15px; color: #ffca28; }
@@ -41,7 +51,6 @@
     import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
     import { getDatabase, ref, set, get, onValue, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-    // 🎯 取得していただいた本物のFirebase設定を反映しました
     const firebaseConfig = {
       apiKey: "AIzaSyBdT1yWLsKQ8hyktm0TgCtkc3jLKlOVllY",
       authDomain: "takei-netplus.firebaseapp.com",
@@ -83,6 +92,9 @@
         }
         document.getElementById("login-btn").innerText = "ログアウト";
         document.getElementById("login-btn").onclick = () => signOut(auth);
+
+        // 部屋一覧のリアルタイム監視開始
+        listenRoomList();
       } else {
         modal.style.display = "flex";
         document.getElementById("main-content").style.pointerEvents = "none";
@@ -113,6 +125,40 @@
       }
     };
 
+    // 🌐 部屋リストのリアルタイム表示
+    function listenRoomList() {
+      onValue(ref(db, "rooms"), (snapshot) => {
+        const roomsContainer = document.getElementById("room-list");
+        roomsContainer.innerHTML = "";
+        const data = snapshot.val();
+
+        if (!data) {
+          roomsContainer.innerHTML = "<div style='color:#888;'>現在作成された部屋はありません</div>";
+          return;
+        }
+
+        Object.values(data).forEach((room) => {
+          const item = document.createElement("div");
+          item.className = "room-item";
+          
+          const isFull = room.guest ? true : false;
+          const statusText = isFull ? "対戦中" : "対戦相手募集中";
+
+          item.innerHTML = `
+            <div class="room-info">
+              <div class="room-name">${room.name} ${room.pass ? '🔒' : ''}</div>
+              <div class="room-meta">ホスト: ${room.hostName} | ${room.gameType === 'speed' ? 'スピード' : '神経衰弱'} | ${statusText}</div>
+            </div>
+            <div class="room-actions">
+              ${!isFull && room.host !== currentUser.uid ? `<button onclick="joinRoom('${room.id}', false, '${room.pass}')">参加</button>` : ''}
+              <button class="spectate-btn" onclick="joinRoom('${room.id}', true, '${room.pass}')">👀 観戦</button>
+            </div>
+          `;
+          roomsContainer.appendChild(item);
+        });
+      });
+    }
+
     // 部屋作成
     window.createRoom = async () => {
       if (!currentUser) return alert("ログインが必要です");
@@ -129,6 +175,7 @@
         host: currentUser.uid,
         hostName: currentUser.email.split('@')[0],
         guest: null,
+        guestName: null,
         status: "waiting",
         cards: generateInitialCards(gameType),
         turn: currentUser.uid
@@ -139,12 +186,12 @@
     };
 
     // 部屋に参加 / 観戦
-    window.joinRoom = async (roomId, spectator = false, inputPass = "") => {
+    window.joinRoom = async (roomId, spectator = false, roomPass = "") => {
       const snap = await get(ref(db, `rooms/${roomId}`));
       const room = snap.val();
       if (!room) return alert("部屋が存在しません");
 
-      if (room.pass && room.pass !== inputPass && !spectator) {
+      if (room.pass && !spectator) {
         const pass = prompt("パスワードを入力してください");
         if (pass !== room.pass) return alert("パスワードが違います");
       }
@@ -152,8 +199,13 @@
       currentRoomId = roomId;
       isSpectator = spectator;
 
+      // 参加処理（ホスト以外で、ゲスト欄が空いている場合）
       if (!spectator && room.host !== currentUser.uid && !room.guest) {
-        await update(ref(db, `rooms/${roomId}`), { guest: currentUser.uid, status: "playing" });
+        await update(ref(db, `rooms/${roomId}`), { 
+          guest: currentUser.uid, 
+          guestName: currentUser.email.split('@')[0],
+          status: "playing" 
+        });
       }
 
       document.getElementById("lobby-area").style.display = "none";
@@ -163,6 +215,13 @@
         const data = snapshot.val();
         if (data) renderGame(data);
       });
+    };
+
+    // ロビーへ戻る
+    window.leaveRoom = () => {
+      document.getElementById("lobby-area").style.display = "flex";
+      document.getElementById("game-area").style.display = "none";
+      currentRoomId = null;
     };
 
     function generateInitialCards(gameType) {
@@ -176,8 +235,8 @@
     function renderGame(room) {
       const statusEl = document.getElementById("game-status");
       statusEl.innerText = `[${room.gameType === 'speed' ? 'スピード' : '神経衰弱'}] ` + 
-        (isSpectator ? "👀 観戦中" : "🎮 対戦中") + 
-        ` | ホスト: ${room.hostName} VS ゲスト: ${room.guest ? '参戦中' : '対戦相手待ち...'}`;
+        (isSpectator ? "👀 観戦モード" : "🎮 プレイヤー") + 
+        ` | 🏠 ${room.hostName} VS ⚔️ ${room.guestName || '対戦相手待ち...'}`;
 
       const grid = document.getElementById("cards-grid");
       grid.innerHTML = "";
@@ -229,28 +288,40 @@
 
     <div class="card-panel">
       <!-- ロビー画面 -->
-      <div id="lobby-area" class="lobby">
-        <h2>部屋を作成</h2>
-        <div class="input-group">
-          <label>部屋名</label>
-          <input type="text" id="room-name" placeholder="例: 勝負しようぜ">
+      <div id="lobby-area" class="lobby-container">
+        <!-- 部屋作成 -->
+        <div class="lobby-box">
+          <h3 style="margin-top:0;">部屋を作成</h3>
+          <div class="input-group">
+            <label>部屋名</label>
+            <input type="text" id="room-name" placeholder="例: 勝負しようぜ">
+          </div>
+          <div class="input-group">
+            <label>対戦パスワード (任意)</label>
+            <input type="password" id="room-pass" placeholder="合言葉">
+          </div>
+          <div class="input-group">
+            <label>ゲームの種類</label>
+            <select id="game-type">
+              <option value="memory">神経衰弱 (Memory)</option>
+              <option value="speed">スピード (Speed)</option>
+            </select>
+          </div>
+          <button onclick="createRoom()" style="width:100%;">作成して入室</button>
         </div>
-        <div class="input-group">
-          <label>対戦パスワード (任意)</label>
-          <input type="password" id="room-pass" placeholder="合言葉">
+
+        <!-- 部屋一覧・観戦 -->
+        <div class="lobby-box">
+          <h3 style="margin-top:0;">対戦部屋一覧</h3>
+          <div id="room-list">
+            <!-- ここに作成された部屋がリアルタイムで一覧表示されます -->
+          </div>
         </div>
-        <div class="input-group">
-          <label>ゲームの種類</label>
-          <select id="game-type">
-            <option value="memory">神経衰弱 (Memory)</option>
-            <option value="speed">スピード (Speed)</option>
-          </select>
-        </div>
-        <button onclick="createRoom()">部屋を作る</button>
       </div>
 
       <!-- ゲーム画面 -->
       <div id="game-area" class="game-board">
+        <button onclick="leaveRoom()" style="float:left; background:#555;">← 退出する</button>
         <div id="game-status" class="status-bar">対戦準備中...</div>
         <div id="cards-grid" class="cards-grid"></div>
       </div>
