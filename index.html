@@ -38,7 +38,7 @@
 
     /* ゲーム画面 */
     .game-board { display: none; }
-    .score-board { display: flex; justify-style: space-around; background: rgba(0,0,0,0.3); padding: 8px; border-radius: 8px; margin-bottom: 10px; font-weight: bold; font-size: 14px; }
+    .score-board { display: flex; justify-content: space-around; background: rgba(0,0,0,0.3); padding: 8px; border-radius: 8px; margin-bottom: 10px; font-weight: bold; font-size: 14px; }
     .status-bar { font-size: 16px; font-weight: bold; margin-bottom: 10px; color: #ffca28; min-height: 24px; }
     
     /* トランプ共通スタイル */
@@ -261,10 +261,10 @@
       showToast("部屋を削除しました");
     };
 
-    // 💡 ユニークな数字（枠数）をカウントする関数（配列ガード付き）
+    // 安全に配列化して固有数字の枠数を計算
     function getUniqueSlotCount(hand) {
-      if (!Array.isArray(hand) || hand.length === 0) return 0;
-      return new Set(hand.map(c => c.num)).size;
+      const safeHand = Array.isArray(hand) ? hand : [];
+      return new Set(safeHand.map(c => c && c.num)).size;
     }
 
     window.createRoom = async () => {
@@ -323,7 +323,6 @@
         if (room.gameType === 'speed' && room.speedState) {
           let p2Deck = Array.isArray(room.speedState.deck2) ? [...room.speedState.deck2] : [];
           let p2Hand = [];
-          // P2も4枠埋まるまで引く
           while (getUniqueSlotCount(p2Hand) < 4 && p2Deck.length > 0) {
             p2Hand.push(p2Deck.shift());
           }
@@ -371,7 +370,6 @@
       const c1 = p1Deck.pop();
       const c2 = p2Deck.pop();
 
-      // P1の手札を4枠（4種類）埋まるまで引く
       let p1Hand = [];
       while (getUniqueSlotCount(p1Hand) < 4 && p1Deck.length > 0) {
         p1Hand.push(p1Deck.shift());
@@ -414,16 +412,16 @@
       container.className = "cards-grid";
       container.innerHTML = "";
 
-      const cards = room.cards || [];
+      const cards = Array.isArray(room.cards) ? room.cards : [];
       cards.forEach((card, index) => {
         const wrapper = document.createElement("div");
         wrapper.className = `card-container ${card.flipped ? 'flipped' : ''} ${card.matched ? 'matched' : ''}`;
         
-        const isRed = card.suit === '♥' || card.suit === '♦';
+        const isRedCard = card.suit === '♥' || card.suit === '♦';
         wrapper.innerHTML = `
           <div class="card-inner">
             <div class="card-back"></div>
-            <div class="card-front ${isRed ? 'red' : ''}">${card.suit}${card.num}</div>
+            <div class="card-front ${isRedCard ? 'red' : ''}">${card.suit}${card.num}</div>
           </div>
         `;
         if (!isSpectator && !card.matched) wrapper.onclick = () => onMemoryCardClick(index, room);
@@ -475,7 +473,7 @@
       }
     }
 
-    // ⚡ スピードボード描画（安全フォールバック付き）
+    // ⚡ スピードボード描画
     function renderSpeedBoard(room) {
       const container = document.getElementById("game-container");
       container.className = "speed-board";
@@ -486,7 +484,7 @@
 
       const isHost = currentUser.uid === room.host;
 
-      // 配列の安全確保
+      // 配列でない場合は空配列でフォールバック
       const hHand = Array.isArray(state.hand1) ? state.hand1 : [];
       const hDeck = Array.isArray(state.deck1) ? state.deck1 : [];
       const gHand = Array.isArray(state.hand2) ? state.hand2 : [];
@@ -531,6 +529,7 @@
       
       const grouped = {};
       myHand.forEach((card, idx) => {
+        if (!card) return;
         if (!grouped[card.num]) grouped[card.num] = [];
         grouped[card.num].push({ card, idx });
       });
@@ -554,9 +553,10 @@
     }
 
     function renderGroupedHandHTML(handCards, isDisable = false) {
-      if (!Array.isArray(handCards) || handCards.length === 0) return '<div style="font-size:12px; color:#aaa;">なし</div>';
+      if (!handCards || handCards.length === 0) return '<div style="font-size:12px; color:#aaa;">なし</div>';
       const grouped = {};
       handCards.forEach((card) => {
+        if (!card) return;
         if (!grouped[card.num]) grouped[card.num] = [];
         grouped[card.num].push(card);
       });
@@ -575,17 +575,16 @@
       return `${card.suit}${n}`; 
     }
 
-    // ⚡ カード提出ロジック（山札ゼロ・4枚以下の時もエラーなく動作）
+    // ⚡ カード提出ロジック（安全処理＆山札切れ完全対応）
     async function handleSpeedPlay(indicesToPlay, room) {
       if (isSpectator || room.status !== "playing") return;
 
       const isHost = currentUser.uid === room.host;
-      const state = room.speedState;
-      if (!state) return;
+      const state = room.speedState || {};
 
-      // 安全に配列を取得
-      let myHand = Array.isArray(isHost ? state.hand1 : state.hand2) ? [...(isHost ? state.hand1 : state.hand2)] : [];
-      let myDeck = Array.isArray(isHost ? state.deck1 : state.deck2) ? [...(isHost ? state.deck1 : state.deck2)] : [];
+      // 🛡️ state の各配列を確実に配列として参照（is not iterable エラーを完全に防ぐ）
+      let myHand = isHost ? (Array.isArray(state.hand1) ? [...state.hand1] : []) : (Array.isArray(state.hand2) ? [...state.hand2] : []);
+      let myDeck = isHost ? (Array.isArray(state.deck1) ? [...state.deck1] : []) : (Array.isArray(state.deck2) ? [...state.deck2] : []);
 
       if (indicesToPlay.length === 0 || !myHand[indicesToPlay[0]]) return;
 
@@ -596,21 +595,23 @@
       else if (state.center2 && canPlaySpeedStrict(firstCard.num, state.center2.num)) targetCenter = "center2";
 
       if (targetCenter) {
+        // インデックスが大きい順から取り除くことで配列ずれを防止
         const sortedIndices = [...indicesToPlay].sort((a, b) => b - a);
         const playedCards = [];
         sortedIndices.forEach(idx => {
-          if (idx < myHand.length) {
-            playedCards.push(myHand.splice(idx, 1)[0]);
-          }
+          const removed = myHand.splice(idx, 1)[0];
+          if (removed) playedCards.push(removed);
         });
 
         if (playedCards.length === 0) return;
         const topPlayedCard = playedCards[0];
 
-        // 💡 手札のユニークな枠数（数字の種類）が 4 未満かつ「山札がある場合のみ」引き続ける
+        // 🛡️ 山札が残っている時だけ手札に補充（山札が無ければ0〜3枚のままでもカードを出して進められる）
         while (getUniqueSlotCount(myHand) < 4 && myDeck.length > 0) {
-          const drawn = myDeck.shift();
-          if (drawn) myHand.push(drawn);
+          const drawnCard = myDeck.shift();
+          if (drawnCard) {
+            myHand.push(drawnCard);
+          }
         }
 
         let updates = {
@@ -637,6 +638,7 @@
     }
 
     function canPlaySpeedStrict(cardNum, centerNum) {
+      if (!cardNum || !centerNum) return false;
       const diff = Math.abs(cardNum - centerNum);
       if (diff === 1) return true;
       if ((cardNum === 1 && centerNum === 13) || (cardNum === 13 && centerNum === 1)) return true;
@@ -648,18 +650,16 @@
       const snap = await get(ref(db, `rooms/${currentRoomId}`));
       const room = snap.val();
       if (!room || !room.speedState) return;
-      const state = room.speedState;
       
-      const c1 = state.center1 ? state.center1.num : 0;
-      const c2 = state.center2 ? state.center2.num : 0;
+      const state = room.speedState;
+      const c1 = state.center1 ? state.center1.num : null;
+      const c2 = state.center2 ? state.center2.num : null;
 
       const hand1 = Array.isArray(state.hand1) ? state.hand1 : [];
       const hand2 = Array.isArray(state.hand2) ? state.hand2 : [];
       const allHands = [...hand1, ...hand2];
 
-      const canAnyonePlay = allHands.some(card => 
-        (c1 && canPlaySpeedStrict(card.num, c1)) || (c2 && canPlaySpeedStrict(card.num, c2))
-      );
+      const canAnyonePlay = allHands.some(card => card && (canPlaySpeedStrict(card.num, c1) || canPlaySpeedStrict(card.num, c2)));
 
       if (canAnyonePlay) {
         showToast("⚠️ まだ出せるカードが手札に残っています！");
