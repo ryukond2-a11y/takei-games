@@ -13,7 +13,8 @@
     .avatar { width: 36px; height: 36px; border-radius: 50%; background: #444; display: flex; align-items: center; justify-content: center; font-size: 18px; }
     .stats-badge { background: #ffca28; color: #000; padding: 4px 10px; border-radius: 12px; font-weight: bold; font-size: 13px; }
     
-    button { cursor: pointer; border: none; padding: 8px 16px; border-radius: 6px; font-weight: bold; background: #0088cc; color: white; }
+    button { cursor: pointer; border: none; padding: 8px 16px; border-radius: 6px; font-weight: bold; background: #0088cc; color: white; transition: transform 0.1s, background 0.2s; }
+    button:active { transform: scale(0.95); }
     button.spectate-btn { background: #4a148c; }
     button:disabled { opacity: 0.5; cursor: not-allowed; }
 
@@ -25,9 +26,9 @@
     .input-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
     input, select { padding: 10px; border-radius: 6px; border: 1px solid #444; background: #2c5364; color: white; width: 100%; }
     
-    .room-item { background: #2c5364; padding: 12px; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+    .room-item { background: #2c5364; padding: 12px; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; animation: fadeIn 0.3s ease; }
     .room-info { display: flex; flex-direction: column; gap: 4px; }
-    .room-name { font-weight: bold; font-size: 16px; }
+    .room-name { font-weight: bold; font-size: 16px; color: #81d4fa; }
     .room-meta { font-size: 12px; color: #b0bec5; }
     .room-actions { display: flex; gap: 6px; }
 
@@ -36,18 +37,31 @@
     .score-board { display: flex; justify-content: space-around; background: rgba(0,0,0,0.3); padding: 12px; border-radius: 8px; margin-bottom: 15px; font-weight: bold; }
     .status-bar { font-size: 20px; font-weight: bold; margin-bottom: 15px; color: #ffca28; }
     
-    /* トランプスタイル */
-    .cards-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; justify-content: center; max-width: 600px; margin: 0 auto; }
-    .card { width: 65px; height: 90px; background: white; color: black; border-radius: 6px; display: flex; justify-content: center; align-items: center; font-size: 20px; font-weight: bold; user-select: none; border: 2px solid #ccc; cursor: pointer; }
-    .card.red { color: #d32f2f; }
-    .card.back { background: #1e88e5; color: transparent; }
-    .card.matched { visibility: hidden; }
-    .card.selected { border: 3px solid #ffca28; box-shadow: 0 0 10px #ffca28; }
+    /* トランプスタイル & 3Dフリップアニメーション */
+    .cards-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; justify-content: center; max-width: 600px; margin: 0 auto; perspective: 1000px; }
+    .card-container { width: 65px; height: 90px; perspective: 600px; cursor: pointer; }
+    .card-inner { width: 100%; height: 100%; position: relative; transform-style: preserve-3d; transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+    .card-container.flipped .card-inner { transform: rotateY(180deg); }
 
-    /* スピード専用レイアウト */
+    .card-front, .card-back { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 6px; display: flex; justify-content: center; align-items: center; font-size: 20px; font-weight: bold; user-select: none; border: 2px solid #ccc; box-shadow: 0 2px 6px rgba(0,0,0,0.3); }
+    .card-front { background: white; color: black; transform: rotateY(180deg); }
+    .card-front.red { color: #d32f2f; }
+    .card-back { background: linear-gradient(135deg, #1e88e5, #1565c0); color: transparent; }
+    .card-container.matched { animation: matchDisappear 0.5s forwards; }
+
+    /* スピード専用レイアウト & 動き */
     .speed-board { display: flex; flex-direction: column; gap: 20px; align-items: center; margin-top: 10px; }
-    .center-table { display: flex; gap: 20px; background: #1b4d3e; padding: 15px; border-radius: 12px; align-items: center; }
+    .center-table { display: flex; gap: 20px; background: #1b4d3e; padding: 15px; border-radius: 12px; align-items: center; box-shadow: inset 0 0 10px rgba(0,0,0,0.5); }
     .hand-area { display: flex; gap: 10px; }
+    .speed-card { width: 65px; height: 90px; background: white; color: black; border-radius: 6px; display: flex; justify-content: center; align-items: center; font-size: 20px; font-weight: bold; border: 2px solid #ccc; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+    .speed-card:hover { transform: translateY(-8px); box-shadow: 0 6px 12px rgba(0,0,0,0.4); }
+    .speed-card.red { color: #d32f2f; }
+    .speed-card.played-anim { animation: playToCenter 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+
+    /* アニメーションキーフレーム定義 */
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes matchDisappear { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.2); opacity: 0.8; } 100% { transform: scale(0); opacity: 0; visibility: hidden; } }
+    @keyframes playToCenter { 0% { transform: scale(0.5); opacity: 0.5; } 100% { transform: scale(1); opacity: 1; } }
 
     /* ログインモーダル */
     .modal { display: flex; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); justify-content: center; align-items: center; z-index: 9999; }
@@ -56,8 +70,8 @@
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-    import { getDatabase, ref, set, get, onValue, update, runTransaction } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+    import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getDatabase, ref, set, get, onValue, update, remove, runTransaction } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyBdT1yWLsKQ8hyktm0TgCtkc3jLKlOVllY",
@@ -79,7 +93,7 @@
     let isSpectator = false;
     let gameEnded = false;
 
-    // 🔒 認証状態と勝率の読み込み
+    // 🔒 認証状態確認
     onAuthStateChanged(auth, async (user) => {
       currentUser = user;
       const modal = document.getElementById("login-modal");
@@ -102,7 +116,7 @@
       }
     });
 
-    // 📊 成績と勝率表示の読み込み
+    // 📊 成績と勝率の読み込み
     function loadUserStats(uid) {
       onValue(ref(db, `stats/${uid}`), (snap) => {
         const stats = snap.val() || { wins: 0, losses: 0, draws: 0 };
@@ -112,7 +126,7 @@
       });
     }
 
-    // 🏆 戦績の記録更新（トランザクション処理）
+    // 🏆 戦績の記録更新
     async function recordResult(winnerUid, loserUid, isDraw = false) {
       if (isDraw) {
         if (currentUser.uid === winnerUid) runTransaction(ref(db, `stats/${winnerUid}/draws`), c => (c || 0) + 1);
@@ -123,6 +137,20 @@
       } else if (currentUser.uid === loserUid) {
         runTransaction(ref(db, `stats/${loserUid}/losses`), c => (c || 0) + 1);
       }
+    }
+
+    // 🧹 1時間経過した古い部屋の自動クリーンアップ処理
+    function cleanupOldRooms(roomsData) {
+      if (!roomsData) return;
+      const now = Date.now();
+      const ONE_HOUR_MS = 60 * 60 * 1000;
+
+      Object.entries(roomsData).forEach(([roomId, room]) => {
+        if (room.createdAt && (now - room.createdAt > ONE_HOUR_MS)) {
+          // 1時間以上前の部屋を自動削除
+          remove(ref(db, `rooms/${roomId}`));
+        }
+      });
     }
 
     // 🔐 ログイン処理
@@ -136,7 +164,7 @@
       }
     };
 
-    // 🌐 部屋リストのリアルタイム表示
+    // 🌐 部屋リストのリアルタイム表示＆自動クリーンアップ呼び出し
     function listenRoomList() {
       onValue(ref(db, "rooms"), (snapshot) => {
         const roomsContainer = document.getElementById("room-list");
@@ -147,6 +175,9 @@
           roomsContainer.innerHTML = "<div style='color:#888;'>現在作成された部屋はありません</div>";
           return;
         }
+
+        // ⏱ 期限切れ部屋の自動削除実行
+        cleanupOldRooms(data);
 
         Object.values(data).forEach((room) => {
           const item = document.createElement("div");
@@ -168,7 +199,7 @@
       });
     }
 
-    // 部屋作成
+    // 部屋作成（作成日時 createdAt を追加記録）
     window.createRoom = async () => {
       if (!currentUser) return alert("ログインが必要です");
       const roomName = document.getElementById("room-name").value || "対戦部屋";
@@ -181,6 +212,7 @@
         name: roomName,
         pass: pass || "",
         gameType: gameType,
+        createdAt: Date.now(), // ⏱ 1時間後削除用の作成時刻
         host: currentUser.uid,
         hostName: currentUser.email.split('@')[0],
         guest: null,
@@ -193,18 +225,18 @@
       if (gameType === 'memory') {
         initialData.cards = generateMemoryCards();
       } else {
-        initialData.speedState = initSpeedGame(currentUser.uid);
+        initialData.speedState = initSpeedGame();
       }
 
       await set(ref(db, `rooms/${roomId}`), initialData);
       joinRoom(roomId, false, pass);
     };
 
-    // 部屋参加/観戦
+    // 部屋参加
     window.joinRoom = async (roomId, spectator = false, roomPass = "") => {
       const snap = await get(ref(db, `rooms/${roomId}`));
       const room = snap.val();
-      if (!room) return alert("部屋が存在しません");
+      if (!room) return alert("部屋が存在しません（削除された可能性があります）");
 
       if (room.pass && !spectator) {
         const pass = prompt("パスワードを入力してください");
@@ -223,7 +255,6 @@
           [`scores/${currentUser.uid}`]: 0
         };
         if (room.gameType === 'speed') {
-          // ゲスト参加時にスピードの山札・手札を生成
           const p2Cards = room.speedState.deck2;
           updates["speedState/hand2"] = p2Cards.slice(0, 4);
           updates["speedState/deck2"] = p2Cards.slice(4);
@@ -237,6 +268,7 @@
       onValue(ref(db, `rooms/${roomId}`), (snapshot) => {
         const data = snapshot.val();
         if (data) renderGame(data);
+        else leaveRoom(); // 部屋が削除されたら自動退出
       });
     };
 
@@ -256,7 +288,7 @@
     }
 
     // --- ⚡ スピードロジック ---
-    function initSpeedGame(hostUid) {
+    function initSpeedGame() {
       const suits = ['♠', '♥', '♦', '♣'];
       let deck = [];
       suits.forEach(s => {
@@ -299,18 +331,25 @@
       }
     }
 
-    // 🧠 神経衰弱画面描画
+    // 🧠 神経衰弱（3Dフリップ＆揃ったアニメーション付き）
     function renderMemoryBoard(room) {
       const container = document.getElementById("game-container");
       container.className = "cards-grid";
       container.innerHTML = "";
 
       room.cards.forEach((card, index) => {
-        const cardDiv = document.createElement("div");
-        cardDiv.className = `card ${card.suit === '♥' || card.suit === '♦' ? 'red' : ''} ${!card.flipped ? 'back' : ''} ${card.matched ? 'matched' : ''}`;
-        cardDiv.innerText = card.flipped ? `${card.suit}${card.num}` : '';
-        cardDiv.onclick = () => onMemoryCardClick(index, room);
-        container.appendChild(cardDiv);
+        const wrapper = document.createElement("div");
+        wrapper.className = `card-container ${card.flipped ? 'flipped' : ''} ${card.matched ? 'matched' : ''}`;
+        
+        const isRed = card.suit === '♥' || card.suit === '♦';
+        wrapper.innerHTML = `
+          <div class="card-inner">
+            <div class="card-back"></div>
+            <div class="card-front ${isRed ? 'red' : ''}">${card.suit}${card.num}</div>
+          </div>
+        `;
+        wrapper.onclick = () => onMemoryCardClick(index, room);
+        container.appendChild(wrapper);
       });
     }
 
@@ -345,15 +384,20 @@
               if (hScore > gScore) recordResult(room.host, room.guest);
               else if (gScore > hScore) recordResult(room.guest, room.host);
               else recordResult(room.host, room.guest, true);
+
+              alert("🏆 試合終了です！部屋を削除します。");
+              // 🧹 試合終了後にFirebaseから部屋データを自動削除
+              await remove(ref(db, `rooms/${currentRoomId}`));
+              return;
             }
           }
 
           await update(ref(db, `rooms/${currentRoomId}`), { cards: cards, turn: nextTurn, scores: scores });
-        }, 1000);
+        }, 800);
       }
     }
 
-    // ⚡ スピード画面描画
+    // ⚡ スピード画面描画（アニメーション付き）
     function renderSpeedBoard(room) {
       const container = document.getElementById("game-container");
       container.className = "speed-board";
@@ -372,8 +416,8 @@
         <div style="font-size:14px; color:#aaa;">相手の手札: ${oppHand.length}枚 | 山札: ${oppDeck.length}枚</div>
         
         <div class="center-table">
-          <div>台札1<div id="c1" class="card ${isRed(state.center1)}">${formatCard(state.center1)}</div></div>
-          <div>台札2<div id="c2" class="card ${isRed(state.center2)}">${formatCard(state.center2)}</div></div>
+          <div>台札1<div id="c1" class="speed-card played-anim ${isRed(state.center1)}">${formatCard(state.center1)}</div></div>
+          <div>台札2<div id="c2" class="speed-card played-anim ${isRed(state.center2)}">${formatCard(state.center2)}</div></div>
           <button onclick="resetSpeedCenter()" style="margin-left:10px; background:#d32f2f;">手詰まりリセット</button>
         </div>
 
@@ -384,7 +428,7 @@
       const handArea = document.getElementById("my-hand-area");
       myHand.forEach((card, idx) => {
         const cEl = document.createElement("div");
-        cEl.className = `card ${isRed(card)}`;
+        cEl.className = `speed-card ${isRed(card)}`;
         cEl.innerText = formatCard(card);
         cEl.onclick = () => handleSpeedPlay(idx, room);
         handArea.appendChild(cEl);
@@ -398,7 +442,7 @@
       return `${card.suit}${n}`; 
     }
 
-    // ⚡ スピード カード出す判定
+    // ⚡ スピード カード出す処理＆試合終了後の自動削除
     async function handleSpeedPlay(handIdx, room) {
       if (isSpectator || room.status !== "playing") return;
 
@@ -408,13 +452,11 @@
       let myDeck = isHost ? [...state.deck1] : [...state.deck2];
       const playedCard = myHand[handIdx];
 
-      // 台札1または2に出せるかチェック
       let targetCenter = null;
       if (canPlaySpeed(playedCard.num, state.center1.num)) targetCenter = "center1";
       else if (canPlaySpeed(playedCard.num, state.center2.num)) targetCenter = "center2";
 
       if (targetCenter) {
-        // カード提出成功
         myHand.splice(handIdx, 1);
         if (myDeck.length > 0) {
           myHand.push(myDeck.shift());
@@ -426,13 +468,17 @@
           [`speedState/${isHost ? 'deck1' : 'deck2'}`]: myDeck
         };
 
-        // 勝利判定（手札も山札もゼロ）
+        // 🏆 スピード勝利判定＆自動部屋削除
         if (myHand.length === 0 && myDeck.length === 0 && !gameEnded) {
           gameEnded = true;
           const winner = currentUser.uid;
           const loser = isHost ? room.guest : room.host;
           recordResult(winner, loser);
-          alert("🎉 あなたの勝ちです！");
+
+          alert("🎉 勝負あり！あなたの勝利です！部屋を削除します。");
+          // 🧹 試合終了後にFirebaseから部屋データを自動削除
+          await remove(ref(db, `rooms/${currentRoomId}`));
+          return;
         }
 
         await update(ref(db, `rooms/${currentRoomId}`), updates);
@@ -446,7 +492,7 @@
       return false;
     }
 
-    // 手詰まり時のリセット
+    // 手詰まりリセット
     window.resetSpeedCenter = async () => {
       const snap = await get(ref(db, `rooms/${currentRoomId}`));
       const room = snap.val();
@@ -487,8 +533,8 @@
         <div class="lobby-box">
           <h3 style="margin-top:0;">部屋を作成</h3>
           <div class="input-group">
-            <label>部屋名</label>
-            <input type="text" id="room-name" placeholder="例: 勝負しようぜ">
+            <label>部屋名（試合名）</label>
+            <input type="text" id="room-name" placeholder="例: 決勝戦！">
           </div>
           <div class="input-group">
             <label>対戦パスワード (任意)</label>
