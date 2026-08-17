@@ -57,13 +57,12 @@
     .card-front.red { color: #d32f2f; }
     .card-back { background: linear-gradient(135deg, #1e88e5, #1565c0); color: transparent; }
     
-    /* 点滅防止：一度消失したカードはアニメーションを消して完全に非表示に固定 */
     .card-container.matched { visibility: hidden; opacity: 0; pointer-events: none; }
 
-    /* ⚡ スピード専用スマホ表示 */
+    /* ⚡ スピード専用表示 */
     .speed-board { display: flex; flex-direction: column; gap: 10px; align-items: center; }
     .center-table { display: flex; gap: 12px; background: #1b4d3e; padding: 10px 16px; border-radius: 12px; align-items: center; box-shadow: inset 0 0 10px rgba(0,0,0,0.6); }
-    .hand-area { display: flex; gap: 12px; justify-content: center; min-height: 90px; padding: 6px 0; }
+    .hand-area { display: flex; gap: 12px; justify-content: center; min-height: 90px; padding: 6px 0; flex-wrap: wrap; }
     
     /* 手札で同数字を重ねるスタイル */
     .card-group { position: relative; display: flex; cursor: pointer; }
@@ -74,10 +73,9 @@
     .speed-card { transition: transform 0.15s ease-out, box-shadow 0.15s; }
     .speed-card:active { transform: scale(1.1) translateY(-8px); }
 
-    /* アニメーション定義 */
     @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 
-    /* トーストメッセージ（自動で消えるポップアップ） */
+    /* トーストメッセージ */
     .toast-popup {
       position: fixed;
       top: 20px;
@@ -153,7 +151,6 @@
       }
     });
 
-    // 🏆 勝率ロード＆正確な計算ロジック
     function loadUserStats(uid) {
       onValue(ref(db, `stats/${uid}`), (snap) => {
         const stats = snap.val() || { wins: 0, losses: 0, draws: 0 };
@@ -165,7 +162,6 @@
       });
     }
 
-    // 勝敗データのトランザクション記録
     async function recordResult(winnerUid, loserUid, isDraw = false) {
       if (isDraw) {
         if (currentUser.uid === winnerUid) runTransaction(ref(db, `stats/${winnerUid}/draws`), c => (c || 0) + 1);
@@ -178,7 +174,6 @@
       }
     }
 
-    // 🔔 自動で消えるトーストポップアップを表示
     window.showToast = (msg) => {
       const toast = document.getElementById("toast-popup");
       toast.innerText = msg;
@@ -252,7 +247,6 @@
       });
     };
 
-    // 🗑️ パスワード入力による部屋削除
     window.deleteRoomPrompt = async (roomId, roomPass) => {
       if (roomPass) {
         const inputPass = prompt("部屋削除用のパスワードを入力してください:");
@@ -266,6 +260,12 @@
       await remove(ref(db, `rooms/${roomId}`));
       showToast("部屋を削除しました");
     };
+
+    // 💡 ユニークな数字（枠数）をカウントする関数
+    function getUniqueSlotCount(hand) {
+      if (!hand) return 0;
+      return new Set(hand.map(c => c.num)).size;
+    }
 
     window.createRoom = async () => {
       if (!currentUser) return showToast("ログインが必要です");
@@ -321,9 +321,14 @@
           [`scores/${currentUser.uid}`]: 0
         };
         if (room.gameType === 'speed') {
-          const p2Cards = room.speedState.deck2;
-          updates["speedState/hand2"] = p2Cards.slice(0, 4);
-          updates["speedState/deck2"] = p2Cards.slice(4);
+          let p2Deck = [...room.speedState.deck2];
+          let p2Hand = [];
+          // P2も4枠埋まるまで引く
+          while (getUniqueSlotCount(p2Hand) < 4 && p2Deck.length > 0) {
+            p2Hand.push(p2Deck.shift());
+          }
+          updates["speedState/hand2"] = p2Hand;
+          updates["speedState/deck2"] = p2Deck;
         }
         await update(ref(db, `rooms/${roomId}`), updates);
       }
@@ -360,14 +365,23 @@
       });
       deck.sort(() => Math.random() - 0.5);
 
-      const p1Deck = deck.slice(0, 26);
-      const p2Deck = deck.slice(26, 52);
+      let p1Deck = deck.slice(0, 26);
+      let p2Deck = deck.slice(26, 52);
+
+      const c1 = p1Deck.pop();
+      const c2 = p2Deck.pop();
+
+      // P1の手札を4枠（4種類）埋まるまで引く
+      let p1Hand = [];
+      while (getUniqueSlotCount(p1Hand) < 4 && p1Deck.length > 0) {
+        p1Hand.push(p1Deck.shift());
+      }
 
       return {
-        center1: p1Deck.pop(),
-        center2: p2Deck.pop(),
-        hand1: p1Deck.slice(0, 4),
-        deck1: p1Deck.slice(4),
+        center1: c1,
+        center2: c2,
+        hand1: p1Hand,
+        deck1: p1Deck,
         hand2: [],
         deck2: p2Deck
       };
@@ -460,7 +474,7 @@
       }
     }
 
-    // ⚡ スピードボード描画（同数字を厳密に1枠としてまとめ、山札0で手札からダイレクト減量）
+    // ⚡ スピードボード描画
     function renderSpeedBoard(room) {
       const container = document.getElementById("game-container");
       container.className = "speed-board";
@@ -478,7 +492,7 @@
         const gDeck = state.deck2 || [];
 
         container.innerHTML = `
-          <div style="font-size:13px; font-weight:bold; color:#81d4fa;">🏠 ホスト (${room.hostName}) 手札: ${hHand.length}枚 (山札: ${hDeck.length}枚)</div>
+          <div style="font-size:13px; font-weight:bold; color:#81d4fa;">🏠 ホスト (${room.hostName}) 手札: ${hHand.length}枚 (${getUniqueSlotCount(hHand)}枠) (山札: ${hDeck.length}枚)</div>
           <div class="hand-area">${renderGroupedHandHTML(hHand, true)}</div>
 
           <div class="center-table">
@@ -486,7 +500,7 @@
             <div><span style="font-size:11px; color:#aaa;">台札2</span><div class="card-base ${isRed(state.center2)}">${formatCard(state.center2)}</div></div>
           </div>
 
-          <div style="font-size:13px; font-weight:bold; color:#ffb74d;">⚔️ ゲスト (${room.guestName || '待機中'}) 手札: ${gHand.length}枚 (山札: ${gDeck.length}枚)</div>
+          <div style="font-size:13px; font-weight:bold; color:#ffb74d;">⚔️ ゲスト (${room.guestName || '待機中'}) 手札: ${gHand.length}枚 (${getUniqueSlotCount(gHand)}枠) (山札: ${gDeck.length}枚)</div>
           <div class="hand-area">${renderGroupedHandHTML(gHand, true)}</div>
         `;
         return;
@@ -499,7 +513,7 @@
       const oppDeck = isHost ? (state.deck2 || []) : (state.deck1 || []);
 
       container.innerHTML = `
-        <div style="font-size:12px; color:#aaa;">相手手札: ${oppHand.length}枚 | 山札: ${oppDeck.length}枚</div>
+        <div style="font-size:12px; color:#aaa;">相手手札: ${oppHand.length}枚 (${getUniqueSlotCount(oppHand)}枠) | 山札: ${oppDeck.length}枚</div>
         
         <div class="center-table">
           <div><span style="font-size:11px; color:#aaa;">台札1</span><div class="card-base speed-card ${isRed(state.center1)}">${formatCard(state.center1)}</div></div>
@@ -507,20 +521,18 @@
           <button onclick="resetSpeedCenter()" class="reset-btn">手詰まり<br>リセット</button>
         </div>
 
-        <div style="font-size:13px; font-weight:bold;">あなたの手札: ${myHand.length}枚 (残山札: ${myDeck.length}枚)</div>
+        <div style="font-size:13px; font-weight:bold;">あなたの手札: ${myHand.length}枚 (${getUniqueSlotCount(myHand)}枠) (残山札: ${myDeck.length}枚)</div>
         <div class="hand-area" id="my-hand-area"></div>
       `;
 
       const handArea = document.getElementById("my-hand-area");
       
-      // 手札の数字ごとにグルーピング（ペア・トリプルも1枠化）
       const grouped = {};
       myHand.forEach((card, idx) => {
         if (!grouped[card.num]) grouped[card.num] = [];
         grouped[card.num].push({ card, idx });
       });
 
-      // 同数字カードグループをレンダリング（1枠扱いとし、ペアがあれば手札から一気に出る）
       Object.values(grouped).forEach(group => {
         const groupEl = document.createElement("div");
         groupEl.className = "card-group";
@@ -561,7 +573,7 @@
       return `${card.suit}${n}`; 
     }
 
-    // ⚡ カード提出ロジック（山札切れ後は補充を行わず、直接手札から減らす）
+    // ⚡ カード提出ロジック（手札の「数字の枠数」が4未満かつ山札がある限り何枚でも補充）
     async function handleSpeedPlay(indicesToPlay, room) {
       if (isSpectator || room.status !== "playing") return;
 
@@ -577,7 +589,6 @@
       else if (canPlaySpeedStrict(firstCard.num, state.center2.num)) targetCenter = "center2";
 
       if (targetCenter) {
-        // 同数字のインデックスを降順ソートして手札から一括削除
         const sortedIndices = [...indicesToPlay].sort((a, b) => b - a);
         const playedCards = [];
         sortedIndices.forEach(idx => {
@@ -586,8 +597,8 @@
 
         const topPlayedCard = playedCards[0];
 
-        // 山札が残っている場合のみ4枚になるまで補充（山札0なら補充せず減る一方）
-        while (myHand.length < 4 && myDeck.length > 0) {
+        // 💡 修正箇所：手札のユニークな枠数（数字の種類）が 4 未満かつ山札があれば引き続ける
+        while (getUniqueSlotCount(myHand) < 4 && myDeck.length > 0) {
           myHand.push(myDeck.shift());
         }
 
@@ -597,7 +608,6 @@
           [`speedState/${isHost ? 'deck1' : 'deck2'}`]: myDeck
         };
 
-        // 🏆 先に手札が0枚になったプレイヤーの勝利！
         if (myHand.length === 0 && !gameEnded) {
           gameEnded = true;
           const winner = currentUser.uid;
@@ -622,7 +632,6 @@
       return false;
     }
 
-    // 🛑 手詰まりリセット（自動消去トーストポップアップ使用）
     window.resetSpeedCenter = async () => {
       if (isSpectator) return;
       const snap = await get(ref(db, `rooms/${currentRoomId}`));
@@ -666,7 +675,6 @@
 </head>
 <body>
 
-  <!-- 🔔 自動消去トーストポップアップ -->
   <div id="toast-popup" class="toast-popup"></div>
 
   <div id="main-content">
