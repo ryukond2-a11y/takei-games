@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>takei.net オンライン トランプゲーム</title>
+  <style>
+    * { box-sizing: border-box; font-family: 'Helvetica Neue', Arial, sans-serif; }
+    body { background-color: #0f2027; color: white; text-align: center; margin: 0; padding: 20px; }
+    
+    .header { display: flex; justify-content: space-between; align-items: center; max-width: 800px; margin: 0 auto 20px; background: rgba(255,255,255,0.1); padding: 10px 20px; border-radius: 12px; }
+    .user-box { display: flex; align-items: center; gap: 10px; }
+    .avatar { width: 36px; height: 36px; border-radius: 50%; background: #444; object-fit: cover; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+    button { cursor: pointer; border: none; padding: 8px 16px; border-radius: 6px; font-weight: bold; background: #0088cc; color: white; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .card-panel { max-width: 800px; margin: 0 auto; background: #203a43; padding: 20px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+    
+    /* 部屋リスト・作成フォーム */
+    .lobby { display: flex; flex-direction: column; gap: 15px; max-width: 400px; margin: 0 auto; }
+    .input-group { display: flex; flex-direction: column; gap: 8px; text-align: left; }
+    input, select { padding: 10px; border-radius: 6px; border: 1px solid #444; background: #2c5364; color: white; }
+    
+    /* ゲーム画面 */
+    .game-board { display: none; margin-top: 20px; }
+    .status-bar { font-size: 18px; font-weight: bold; margin-bottom: 15px; color: #ffca28; }
+    .cards-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; justify-content: center; max-width: 600px; margin: 0 auto; }
+    
+    .card { width: 60px; height: 85px; background: white; color: black; border-radius: 6px; display: flex; justify-content: center; align-items: center; font-size: 18px; font-weight: bold; user-select: none; }
+    .card.red { color: #d32f2f; }
+    .card.back { background: #1e88e5; color: transparent; }
+    .card.matched { visibility: hidden; }
+
+    /* 必須ログインモーダル（背景クリックで閉じない強制オーバーレイ） */
+    .modal { display: flex; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); justify-content: center; align-items: center; z-index: 9999; }
+    .modal-content { background: #1c313a; padding: 30px; border-radius: 16px; display: flex; flex-direction: column; gap: 16px; width: 320px; box-shadow: 0 8px 24px rgba(0,0,0,0.8); }
+  </style>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getDatabase, ref, set, get, onValue, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+    // ⚠️ Firebase Console（プロジェクト設定 ＞ マイアプリ）から取得した本物の情報に書き換えてください！
+    const firebaseConfig = {
+      apiKey: "AIzaSy...", // 👈 ここを実際の API キーに変更してください
+      authDomain: "takei-netplus.firebaseapp.com",
+      databaseURL: "https://takei-netplus-default-rtdb.firebaseio.com",
+      projectId: "takei-netplus",
+      storageBucket: "takei-netplus.appspot.com",
+      messagingSenderId: "1234567890",
+      appId: "1:1234567890:web:abcdef..."
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getDatabase(app);
+
+    let currentUser = null;
+    let currentRoomId = null;
+    let isSpectator = false;
+
+    // 🔒 認証状態の監視（未ログイン時は必ずモーダルを強制表示）
+    onAuthStateChanged(auth, async (user) => {
+      currentUser = user;
+      const modal = document.getElementById("login-modal");
+
+      if (user) {
+        // ログイン成功：モーダルを隠してメインコンテンツを有効化
+        modal.style.display = "none";
+        document.getElementById("main-content").style.pointerEvents = "auto";
+        document.getElementById("main-content").style.opacity = "1";
+
+        const snap = await get(ref(db, `users/${user.uid}`));
+        const profile = snap.val() || {};
+        document.getElementById("user-name").innerText = profile.displayName || user.email.split('@')[0];
+        
+        const avatarEl = document.getElementById("user-avatar");
+        if (profile.avatarUrl) {
+          avatarEl.innerHTML = `<img src="${profile.avatarUrl}" class="avatar" alt="">`;
+        } else {
+          avatarEl.innerText = "👤";
+        }
+        document.getElementById("login-btn").innerText = "ログアウト";
+        document.getElementById("login-btn").onclick = () => signOut(auth);
+      } else {
+        // 未ログイン：強制的にログイン画面を出して操作をロック
+        modal.style.display = "flex";
+        document.getElementById("main-content").style.pointerEvents = "none";
+        document.getElementById("main-content").style.opacity = "0.3";
+        document.getElementById("user-name").innerText = "未ログイン";
+        document.getElementById("user-avatar").innerText = "🔒";
+        document.getElementById("login-btn").innerText = "ログイン";
+        document.getElementById("login-btn").onclick = () => { modal.style.display = "flex"; };
+      }
+    });
+
+    // 🔐 ログイン実行
+    window.login = async () => {
+      const email = document.getElementById("email").value;
+      const pass = document.getElementById("password").value;
+      const errEl = document.getElementById("login-error");
+      errEl.innerText = "";
+
+      if (!email || !pass) {
+        errEl.innerText = "メールアドレスとパスワードを入力してください";
+        return;
+      }
+
+      try {
+        await signInWithEmailAndPassword(auth, email, pass);
+      } catch (err) { 
+        errEl.innerText = "ログイン失敗: メールアドレスまたはパスワードが間違っています";
+      }
+    };
+
+    // 部屋作成
+    window.createRoom = async () => {
+      if (!currentUser) return alert("ログインが必要です");
+      const roomName = document.getElementById("room-name").value || "対戦部屋";
+      const pass = document.getElementById("room-pass").value;
+      const gameType = document.getElementById("game-type").value;
+      
+      const roomId = "room_" + Date.now();
+      const roomData = {
+        id: roomId,
+        name: roomName,
+        pass: pass || "",
+        gameType: gameType,
+        host: currentUser.uid,
+        hostName: currentUser.email.split('@')[0],
+        guest: null,
+        status: "waiting",
+        cards: generateInitialCards(gameType),
+        turn: currentUser.uid
+      };
+
+      await set(ref(db, `rooms/${roomId}`), roomData);
+      joinRoom(roomId, false, pass);
+    };
+
+    // 部屋に参加 / 観戦
+    window.joinRoom = async (roomId, spectator = false, inputPass = "") => {
+      const snap = await get(ref(db, `rooms/${roomId}`));
+      const room = snap.val();
+      if (!room) return alert("部屋が存在しません");
+
+      if (room.pass && room.pass !== inputPass && !spectator) {
+        const pass = prompt("パスワードを入力してください");
+        if (pass !== room.pass) return alert("パスワードが違います");
+      }
+
+      currentRoomId = roomId;
+      isSpectator = spectator;
+
+      if (!spectator && room.host !== currentUser.uid && !room.guest) {
+        await update(ref(db, `rooms/${roomId}`), { guest: currentUser.uid, status: "playing" });
+      }
+
+      document.getElementById("lobby-area").style.display = "none";
+      document.getElementById("game-area").style.display = "block";
+
+      onValue(ref(db, `rooms/${roomId}`), (snapshot) => {
+        const data = snapshot.val();
+        if (data) renderGame(data);
+      });
+    };
+
+    function generateInitialCards(gameType) {
+      const suits = ['♠', '♥', '♦', '♣'];
+      const nums = [1, 2, 3, 4, 5, 6];
+      let deck = [];
+      suits.forEach(s => nums.forEach(n => deck.push({ suit: s, num: n, flipped: false, matched: false })));
+      return deck.sort(() => Math.random() - 0.5);
+    }
+
+    function renderGame(room) {
+      const statusEl = document.getElementById("game-status");
+      statusEl.innerText = `[${room.gameType === 'speed' ? 'スピード' : '神経衰弱'}] ` + 
+        (isSpectator ? "👀 観戦中" : "🎮 対戦中") + 
+        ` | ホスト: ${room.hostName} VS ゲスト: ${room.guest ? '参戦中' : '対戦相手待ち...'}`;
+
+      const grid = document.getElementById("cards-grid");
+      grid.innerHTML = "";
+
+      room.cards.forEach((card, index) => {
+        const cardDiv = document.createElement("div");
+        cardDiv.className = `card ${card.suit === '♥' || card.suit === '♦' ? 'red' : ''} ${!card.flipped ? 'back' : ''} ${card.matched ? 'matched' : ''}`;
+        cardDiv.innerText = card.flipped ? `${card.suit}${card.num}` : '';
+        
+        cardDiv.onclick = () => onCardClick(index, room);
+        grid.appendChild(cardDiv);
+      });
+    }
+
+    async function onCardClick(index, room) {
+      if (isSpectator || room.status !== "playing") return;
+      
+      let cards = [...room.cards];
+      if (cards[index].flipped || cards[index].matched) return;
+
+      cards[index].flipped = true;
+      await update(ref(db, `rooms/${currentRoomId}`), { cards: cards });
+
+      const flippedCards = cards.filter(c => c.flipped && !c.matched);
+      if (flippedCards.length === 2) {
+        setTimeout(async () => {
+          if (flippedCards[0].num === flippedCards[1].num) {
+            cards.forEach(c => { if (c.flipped) c.matched = true; });
+          } else {
+            cards.forEach(c => c.flipped = false);
+          }
+          await update(ref(db, `rooms/${currentRoomId}`), { cards: cards });
+        }, 1000);
+      }
+    }
+  </script>
+</head>
+<body>
+
+  <!-- メインコンテンツ領域（未ログイン時は透明＆クリック不可になります） -->
+  <div id="main-content">
+    <div class="header">
+      <div class="user-box">
+        <div id="user-avatar" class="avatar">🔒</div>
+        <span id="user-name">未ログイン</span>
+      </div>
+      <button id="login-btn">ログイン</button>
+    </div>
+
+    <div class="card-panel">
+      <!-- ロビー画面 -->
+      <div id="lobby-area" class="lobby">
+        <h2>部屋を作成</h2>
+        <div class="input-group">
+          <label>部屋名</label>
+          <input type="text" id="room-name" placeholder="例: 勝負しようぜ">
+        </div>
+        <div class="input-group">
+          <label>対戦パスワード (任意)</label>
+          <input type="password" id="room-pass" placeholder="合言葉">
+        </div>
+        <div class="input-group">
+          <label>ゲームの種類</label>
+          <select id="game-type">
+            <option value="memory">神経衰弱 (Memory)</option>
+            <option value="speed">スピード (Speed)</option>
+          </select>
+        </div>
+        <button onclick="createRoom()">部屋を作る</button>
+      </div>
+
+      <!-- ゲーム画面 -->
+      <div id="game-area" class="game-board">
+        <div id="game-status" class="status-bar">対戦準備中...</div>
+        <div id="cards-grid" class="cards-grid"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🔒 強制ログインモーダル -->
+  <div id="login-modal" class="modal">
+    <div class="modal-content">
+      <h2 style="margin: 0; color: #0088cc;">takei.net ログイン</h2>
+      <p style="font-size: 13px; color: #b0bec5; margin: 0;">ゲームを遊ぶにはSNSアカウントでのログインが必要です。</p>
+      
+      <div id="login-error" style="color: #ff5252; font-size: 12px; min-height: 16px;"></div>
+
+      <input type="email" id="email" placeholder="メールアドレス (@takei.net)">
+      <input type="password" id="password" placeholder="パスワード">
+      
+      <button onclick="login()" style="padding: 12px; font-size: 16px; margin-top: 8px;">ログインして開始</button>
+    </div>
+  </div>
+
+</body>
+</html>
