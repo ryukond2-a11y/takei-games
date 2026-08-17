@@ -2,70 +2,77 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>takei.net オンライン トランプゲーム</title>
   <style>
-    * { box-sizing: border-box; font-family: 'Helvetica Neue', Arial, sans-serif; }
-    body { background-color: #0f2027; color: white; text-align: center; margin: 0; padding: 20px; }
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; touch-action: manipulation; }
+    body { background-color: #0f2027; color: white; text-align: center; margin: 0; padding: 10px; -webkit-tap-highlight-color: transparent; }
     
-    .header { display: flex; justify-content: space-between; align-items: center; max-width: 800px; margin: 0 auto 20px; background: rgba(255,255,255,0.1); padding: 10px 20px; border-radius: 12px; }
-    .user-box { display: flex; align-items: center; gap: 10px; }
-    .avatar { width: 36px; height: 36px; border-radius: 50%; background: #444; display: flex; align-items: center; justify-content: center; font-size: 18px; }
-    .stats-badge { background: #ffca28; color: #000; padding: 4px 10px; border-radius: 12px; font-weight: bold; font-size: 13px; }
+    .header { display: flex; justify-content: space-between; align-items: center; max-width: 800px; margin: 0 auto 10px; background: rgba(255,255,255,0.1); padding: 8px 15px; border-radius: 12px; }
+    .user-box { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+    .avatar { width: 32px; height: 32px; border-radius: 50%; background: #444; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+    .stats-badge { background: #ffca28; color: #000; padding: 3px 8px; border-radius: 10px; font-weight: bold; font-size: 12px; }
     
-    button { cursor: pointer; border: none; padding: 8px 16px; border-radius: 6px; font-weight: bold; background: #0088cc; color: white; transition: transform 0.1s, background 0.2s; }
+    button { cursor: pointer; border: none; padding: 10px 16px; border-radius: 8px; font-weight: bold; background: #0088cc; color: white; font-size: 14px; transition: transform 0.1s, background 0.2s; }
     button:active { transform: scale(0.95); }
     button.spectate-btn { background: #4a148c; }
-    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    button.reset-btn { background: #e53935; padding: 8px 12px; font-size: 13px; }
 
-    .card-panel { max-width: 800px; margin: 0 auto; background: #203a43; padding: 20px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+    .card-panel { max-width: 800px; margin: 0 auto; background: #203a43; padding: 15px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
     
-    .lobby-container { display: flex; gap: 20px; text-align: left; }
+    .lobby-container { display: flex; flex-direction: column; gap: 15px; text-align: left; }
+    @media (min-width: 600px) { .lobby-container { flex-direction: row; } }
     .lobby-box { flex: 1; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 12px; }
     
-    .input-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
-    input, select { padding: 10px; border-radius: 6px; border: 1px solid #444; background: #2c5364; color: white; width: 100%; }
+    .input-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+    input, select { padding: 10px; border-radius: 8px; border: 1px solid #444; background: #2c5364; color: white; width: 100%; font-size: 14px; }
     
-    .room-item { background: #2c5364; padding: 12px; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; animation: fadeIn 0.3s ease; }
-    .room-info { display: flex; flex-direction: column; gap: 4px; }
-    .room-name { font-weight: bold; font-size: 16px; color: #81d4fa; }
-    .room-meta { font-size: 12px; color: #b0bec5; }
+    .search-box { margin-bottom: 10px; }
+
+    .room-item { background: #2c5364; padding: 10px 12px; border-radius: 8px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; animation: fadeIn 0.3s ease; }
+    .room-info { display: flex; flex-direction: column; gap: 2px; }
+    .room-name { font-weight: bold; font-size: 15px; color: #81d4fa; }
+    .room-meta { font-size: 11px; color: #b0bec5; }
     .room-actions { display: flex; gap: 6px; }
 
     /* ゲーム画面 */
-    .game-board { display: none; margin-top: 10px; }
-    .score-board { display: flex; justify-content: space-around; background: rgba(0,0,0,0.3); padding: 12px; border-radius: 8px; margin-bottom: 15px; font-weight: bold; }
-    .status-bar { font-size: 20px; font-weight: bold; margin-bottom: 15px; color: #ffca28; }
+    .game-board { display: none; }
+    .score-board { display: flex; justify-content: space-around; background: rgba(0,0,0,0.3); padding: 8px; border-radius: 8px; margin-bottom: 10px; font-weight: bold; font-size: 14px; }
+    .status-bar { font-size: 16px; font-weight: bold; margin-bottom: 10px; color: #ffca28; min-height: 24px; }
     
-    /* トランプスタイル & 3Dフリップアニメーション */
-    .cards-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; justify-content: center; max-width: 600px; margin: 0 auto; perspective: 1000px; }
-    .card-container { width: 65px; height: 90px; perspective: 600px; cursor: pointer; }
+    /* トランプ共通スタイル */
+    .card-base { width: 58px; height: 82px; border-radius: 6px; display: flex; justify-content: center; align-items: center; font-size: 18px; font-weight: bold; user-select: none; border: 2px solid #ddd; box-shadow: 0 3px 6px rgba(0,0,0,0.3); background: white; color: black; }
+    @media (min-width: 400px) { .card-base { width: 68px; height: 96px; font-size: 22px; } }
+    .card-base.red { color: #d32f2f; }
+
+    /* 🧠 神経衰弱 */
+    .cards-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; justify-content: center; max-width: 500px; margin: 0 auto; perspective: 1000px; }
+    .card-container { aspect-ratio: 2/3; perspective: 600px; cursor: pointer; }
     .card-inner { width: 100%; height: 100%; position: relative; transform-style: preserve-3d; transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
     .card-container.flipped .card-inner { transform: rotateY(180deg); }
-
-    .card-front, .card-back { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 6px; display: flex; justify-content: center; align-items: center; font-size: 20px; font-weight: bold; user-select: none; border: 2px solid #ccc; box-shadow: 0 2px 6px rgba(0,0,0,0.3); }
-    .card-front { background: white; color: black; transform: rotateY(180deg); }
+    .card-front, .card-back { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 6px; display: flex; justify-content: center; align-items: center; font-weight: bold; border: 1px solid #ccc; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+    .card-front { background: white; color: black; transform: rotateY(180deg); font-size: 16px; }
     .card-front.red { color: #d32f2f; }
     .card-back { background: linear-gradient(135deg, #1e88e5, #1565c0); color: transparent; }
     .card-container.matched { animation: matchDisappear 0.5s forwards; }
 
-    /* スピード専用レイアウト & 動き */
-    .speed-board { display: flex; flex-direction: column; gap: 20px; align-items: center; margin-top: 10px; }
-    .center-table { display: flex; gap: 20px; background: #1b4d3e; padding: 15px; border-radius: 12px; align-items: center; box-shadow: inset 0 0 10px rgba(0,0,0,0.5); }
-    .hand-area { display: flex; gap: 10px; }
-    .speed-card { width: 65px; height: 90px; background: white; color: black; border-radius: 6px; display: flex; justify-content: center; align-items: center; font-size: 20px; font-weight: bold; border: 2px solid #ccc; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
-    .speed-card:hover { transform: translateY(-8px); box-shadow: 0 6px 12px rgba(0,0,0,0.4); }
-    .speed-card.red { color: #d32f2f; }
-    .speed-card.played-anim { animation: playToCenter 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+    /* ⚡ スピード専用スマホ表示 */
+    .speed-board { display: flex; flex-direction: column; gap: 12px; align-items: center; }
+    .center-table { display: flex; gap: 15px; background: #1b4d3e; padding: 12px 18px; border-radius: 12px; align-items: center; box-shadow: inset 0 0 10px rgba(0,0,0,0.6); }
+    .hand-area { display: flex; gap: 8px; justify-content: center; min-height: 90px; }
+    
+    .speed-card { cursor: pointer; transition: transform 0.15s ease-out, box-shadow 0.15s; }
+    .speed-card:active { transform: scale(1.1) translateY(-10px); }
+    .speed-card.pop-anim { animation: cardPop 0.25s ease-out; }
 
-    /* アニメーションキーフレーム定義 */
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    /* アニメーション定義 */
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
     @keyframes matchDisappear { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.2); opacity: 0.8; } 100% { transform: scale(0); opacity: 0; visibility: hidden; } }
-    @keyframes playToCenter { 0% { transform: scale(0.5); opacity: 0.5; } 100% { transform: scale(1); opacity: 1; } }
+    @keyframes cardPop { 0% { transform: scale(0.6); opacity: 0.3; } 70% { transform: scale(1.1); } 100% { transform: scale(1); opacity: 1; } }
 
-    /* ログインモーダル */
+    /* モーダル */
     .modal { display: flex; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); justify-content: center; align-items: center; z-index: 9999; }
-    .modal-content { background: #1c313a; padding: 30px; border-radius: 16px; display: flex; flex-direction: column; gap: 16px; width: 320px; box-shadow: 0 8px 24px rgba(0,0,0,0.8); }
+    .modal-content { background: #1c313a; padding: 25px; border-radius: 16px; display: flex; flex-direction: column; gap: 12px; width: 90%; max-width: 320px; box-shadow: 0 8px 24px rgba(0,0,0,0.8); }
   </style>
 
   <script type="module">
@@ -92,8 +99,8 @@
     let currentRoomId = null;
     let isSpectator = false;
     let gameEnded = false;
+    let allRoomsCache = {};
 
-    // 🔒 認証状態確認
     onAuthStateChanged(auth, async (user) => {
       currentUser = user;
       const modal = document.getElementById("login-modal");
@@ -116,7 +123,6 @@
       }
     });
 
-    // 📊 成績と勝率の読み込み
     function loadUserStats(uid) {
       onValue(ref(db, `stats/${uid}`), (snap) => {
         const stats = snap.val() || { wins: 0, losses: 0, draws: 0 };
@@ -126,7 +132,6 @@
       });
     }
 
-    // 🏆 戦績の記録更新
     async function recordResult(winnerUid, loserUid, isDraw = false) {
       if (isDraw) {
         if (currentUser.uid === winnerUid) runTransaction(ref(db, `stats/${winnerUid}/draws`), c => (c || 0) + 1);
@@ -139,67 +144,69 @@
       }
     }
 
-    // 🧹 1時間経過した古い部屋の自動クリーンアップ処理
     function cleanupOldRooms(roomsData) {
       if (!roomsData) return;
       const now = Date.now();
       const ONE_HOUR_MS = 60 * 60 * 1000;
-
       Object.entries(roomsData).forEach(([roomId, room]) => {
         if (room.createdAt && (now - room.createdAt > ONE_HOUR_MS)) {
-          // 1時間以上前の部屋を自動削除
           remove(ref(db, `rooms/${roomId}`));
         }
       });
     }
 
-    // 🔐 ログイン処理
     window.login = async () => {
       const email = document.getElementById("email").value;
       const pass = document.getElementById("password").value;
       try {
         await signInWithEmailAndPassword(auth, email, pass);
       } catch (err) { 
-        document.getElementById("login-error").innerText = "ログイン失敗: メールまたはパスワードを確認してください";
+        document.getElementById("login-error").innerText = "ログイン失敗: メール・パスワードを確認してください";
       }
     };
 
-    // 🌐 部屋リストのリアルタイム表示＆自動クリーンアップ呼び出し
     function listenRoomList() {
       onValue(ref(db, "rooms"), (snapshot) => {
-        const roomsContainer = document.getElementById("room-list");
-        roomsContainer.innerHTML = "";
-        const data = snapshot.val();
-
-        if (!data) {
-          roomsContainer.innerHTML = "<div style='color:#888;'>現在作成された部屋はありません</div>";
-          return;
-        }
-
-        // ⏱ 期限切れ部屋の自動削除実行
-        cleanupOldRooms(data);
-
-        Object.values(data).forEach((room) => {
-          const item = document.createElement("div");
-          item.className = "room-item";
-          const isFull = room.guest ? true : false;
-
-          item.innerHTML = `
-            <div class="room-info">
-              <div class="room-name">${room.name} ${room.pass ? '🔒' : ''}</div>
-              <div class="room-meta">ホスト: ${room.hostName} | ${room.gameType === 'speed' ? '⚡スピード' : '🧠神経衰弱'} | ${isFull ? '対戦中' : '募集中'}</div>
-            </div>
-            <div class="room-actions">
-              ${!isFull && room.host !== currentUser.uid ? `<button onclick="joinRoom('${room.id}', false, '${room.pass}')">参加</button>` : ''}
-              <button class="spectate-btn" onclick="joinRoom('${room.id}', true, '${room.pass}')">👀 観戦</button>
-            </div>
-          `;
-          roomsContainer.appendChild(item);
-        });
+        allRoomsCache = snapshot.val() || {};
+        cleanupOldRooms(allRoomsCache);
+        renderRoomList();
       });
     }
 
-    // 部屋作成（作成日時 createdAt を追加記録）
+    // 🔎 部屋名リアルタイム検索フィルタリング
+    window.renderRoomList = () => {
+      const roomsContainer = document.getElementById("room-list");
+      const searchQuery = document.getElementById("search-input").value.toLowerCase();
+      roomsContainer.innerHTML = "";
+
+      const filtered = Object.values(allRoomsCache).filter(room => 
+        room.name.toLowerCase().includes(searchQuery)
+      );
+
+      if (filtered.length === 0) {
+        roomsContainer.innerHTML = "<div style='color:#888; font-size:13px;'>条件に一致する部屋がありません</div>";
+        return;
+      }
+
+      filtered.forEach((room) => {
+        const item = document.createElement("div");
+        item.className = "room-item";
+        const isFull = room.guest ? true : false;
+
+        item.innerHTML = `
+          <div class="room-info">
+            <div class="room-name">${room.name} ${room.pass ? '🔒' : ''}</div>
+            <div class="room-meta">ホスト: ${room.hostName} | ${room.gameType === 'speed' ? '⚡スピード' : '🧠神経衰弱'}</div>
+          </div>
+          <div class="room-actions">
+            ${!isFull && room.host !== currentUser.uid ? `<button onclick="joinRoom('${room.id}', false, '${room.pass}')">参加</button>` : ''}
+            <button class="spectate-btn" onclick="joinRoom('${room.id}', true, '${room.pass}')">👀 観戦</button>
+          </div>
+        `;
+        roomsContainer.appendChild(item);
+      });
+    };
+
     window.createRoom = async () => {
       if (!currentUser) return alert("ログインが必要です");
       const roomName = document.getElementById("room-name").value || "対戦部屋";
@@ -212,7 +219,7 @@
         name: roomName,
         pass: pass || "",
         gameType: gameType,
-        createdAt: Date.now(), // ⏱ 1時間後削除用の作成時刻
+        createdAt: Date.now(),
         host: currentUser.uid,
         hostName: currentUser.email.split('@')[0],
         guest: null,
@@ -232,11 +239,10 @@
       joinRoom(roomId, false, pass);
     };
 
-    // 部屋参加
     window.joinRoom = async (roomId, spectator = false, roomPass = "") => {
       const snap = await get(ref(db, `rooms/${roomId}`));
       const room = snap.val();
-      if (!room) return alert("部屋が存在しません（削除された可能性があります）");
+      if (!room) return alert("部屋が存在しません");
 
       if (room.pass && !spectator) {
         const pass = prompt("パスワードを入力してください");
@@ -268,7 +274,7 @@
       onValue(ref(db, `rooms/${roomId}`), (snapshot) => {
         const data = snapshot.val();
         if (data) renderGame(data);
-        else leaveRoom(); // 部屋が削除されたら自動退出
+        else leaveRoom();
       });
     };
 
@@ -278,7 +284,6 @@
       currentRoomId = null;
     };
 
-    // --- 🧠 神経衰弱ロジック ---
     function generateMemoryCards() {
       const suits = ['♠', '♥', '♦', '♣'];
       const nums = [1, 2, 3, 4, 5, 6];
@@ -287,7 +292,6 @@
       return deck.sort(() => Math.random() - 0.5);
     }
 
-    // --- ⚡ スピードロジック ---
     function initSpeedGame() {
       const suits = ['♠', '♥', '♦', '♣'];
       let deck = [];
@@ -309,7 +313,6 @@
       };
     }
 
-    // 🎮 メイン描画処理
     function renderGame(room) {
       const statusEl = document.getElementById("game-status");
       const hostName = room.hostName;
@@ -326,12 +329,11 @@
           (isSpectator ? "👀 観戦中" : (isMyTurn ? "👑 あなたのターンです！" : "⏳ 相手の考え中..."));
         renderMemoryBoard(room);
       } else {
-        statusEl.innerText = room.status === "waiting" ? "対戦相手を待っています..." : "⚡ スピード！場札に続く数字を出せ！";
+        statusEl.innerText = room.status === "waiting" ? "対戦相手を待っています..." : "⚡ 手札を素早く出せ！";
         renderSpeedBoard(room);
       }
     }
 
-    // 🧠 神経衰弱（3Dフリップ＆揃ったアニメーション付き）
     function renderMemoryBoard(room) {
       const container = document.getElementById("game-container");
       container.className = "cards-grid";
@@ -375,7 +377,6 @@
             nextTurn = room.host === currentUser.uid ? room.guest : room.host;
           }
 
-          // 決着判定
           if (cards.every(c => c.matched)) {
             const hScore = scores[room.host] || 0;
             const gScore = scores[room.guest] || 0;
@@ -385,8 +386,7 @@
               else if (gScore > hScore) recordResult(room.guest, room.host);
               else recordResult(room.host, room.guest, true);
 
-              alert("🏆 試合終了です！部屋を削除します。");
-              // 🧹 試合終了後にFirebaseから部屋データを自動削除
+              alert("🏆 試合終了！部屋をクリアします。");
               await remove(ref(db, `rooms/${currentRoomId}`));
               return;
             }
@@ -397,7 +397,7 @@
       }
     }
 
-    // ⚡ スピード画面描画（アニメーション付き）
+    // ⚡ スピードボード描画
     function renderSpeedBoard(room) {
       const container = document.getElementById("game-container");
       container.className = "speed-board";
@@ -413,22 +413,22 @@
       const oppDeck = isHost ? (state.deck2 || []) : (state.deck1 || []);
 
       container.innerHTML = `
-        <div style="font-size:14px; color:#aaa;">相手の手札: ${oppHand.length}枚 | 山札: ${oppDeck.length}枚</div>
+        <div style="font-size:12px; color:#aaa;">相手手札: ${oppHand.length}枚 | 山札: ${oppDeck.length}枚</div>
         
         <div class="center-table">
-          <div>台札1<div id="c1" class="speed-card played-anim ${isRed(state.center1)}">${formatCard(state.center1)}</div></div>
-          <div>台札2<div id="c2" class="speed-card played-anim ${isRed(state.center2)}">${formatCard(state.center2)}</div></div>
-          <button onclick="resetSpeedCenter()" style="margin-left:10px; background:#d32f2f;">手詰まりリセット</button>
+          <div><span style="font-size:11px; color:#aaa;">台札1</span><div class="card-base speed-card pop-anim ${isRed(state.center1)}">${formatCard(state.center1)}</div></div>
+          <div><span style="font-size:11px; color:#aaa;">台札2</span><div class="card-base speed-card pop-anim ${isRed(state.center2)}">${formatCard(state.center2)}</div></div>
+          <button onclick="resetSpeedCenter()" class="reset-btn">手詰まり<br>リセット</button>
         </div>
 
-        <div style="font-weight:bold; margin-top:10px;">あなたの手札 (残山札: ${myDeck.length}枚)</div>
+        <div style="font-size:13px; font-weight:bold;">あなたの手札 (残山札: ${myDeck.length}枚)</div>
         <div class="hand-area" id="my-hand-area"></div>
       `;
 
       const handArea = document.getElementById("my-hand-area");
       myHand.forEach((card, idx) => {
         const cEl = document.createElement("div");
-        cEl.className = `speed-card ${isRed(card)}`;
+        cEl.className = `card-base speed-card ${isRed(card)}`;
         cEl.innerText = formatCard(card);
         cEl.onclick = () => handleSpeedPlay(idx, room);
         handArea.appendChild(cEl);
@@ -442,7 +442,7 @@
       return `${card.suit}${n}`; 
     }
 
-    // ⚡ スピード カード出す処理＆試合終了後の自動削除
+    // ⚡ カード提出・同じ数字の重ね出し・勝利判定
     async function handleSpeedPlay(handIdx, room) {
       if (isSpectator || room.status !== "playing") return;
 
@@ -453,11 +453,13 @@
       const playedCard = myHand[handIdx];
 
       let targetCenter = null;
+      // ① 隣接する数字（前後1）または ② 同じ数字（重ね出し）が出せるかチェック
       if (canPlaySpeed(playedCard.num, state.center1.num)) targetCenter = "center1";
       else if (canPlaySpeed(playedCard.num, state.center2.num)) targetCenter = "center2";
 
       if (targetCenter) {
         myHand.splice(handIdx, 1);
+        // 山札が残っている場合のみ自動で手札へ補填
         if (myDeck.length > 0) {
           myHand.push(myDeck.shift());
         }
@@ -468,15 +470,14 @@
           [`speedState/${isHost ? 'deck1' : 'deck2'}`]: myDeck
         };
 
-        // 🏆 スピード勝利判定＆自動部屋削除
-        if (myHand.length === 0 && myDeck.length === 0 && !gameEnded) {
+        // 🏆 勝利条件：手札が先に0枚になったプレイヤーの勝ち！
+        if (myHand.length === 0 && !gameEnded) {
           gameEnded = true;
           const winner = currentUser.uid;
           const loser = isHost ? room.guest : room.host;
           recordResult(winner, loser);
 
-          alert("🎉 勝負あり！あなたの勝利です！部屋を削除します。");
-          // 🧹 試合終了後にFirebaseから部屋データを自動削除
+          alert("🎉 手札をすべて出し切りました！あなたの勝ちです！");
           await remove(ref(db, `rooms/${currentRoomId}`));
           return;
         }
@@ -485,32 +486,52 @@
       }
     }
 
+    // 出せる条件：前後1の数字 または 同じ数字の重ね出し
     function canPlaySpeed(cardNum, centerNum) {
+      if (cardNum === centerNum) return true; // 同じ数字の重ね出し
       const diff = Math.abs(cardNum - centerNum);
       if (diff === 1) return true;
       if ((cardNum === 1 && centerNum === 13) || (cardNum === 13 && centerNum === 1)) return true;
       return false;
     }
 
-    // 手詰まりリセット
+    // 🛑 手詰まり時のリセット機能（両者の手札に出せるカードがないか検証）
     window.resetSpeedCenter = async () => {
       const snap = await get(ref(db, `rooms/${currentRoomId}`));
       const room = snap.val();
       const state = room.speedState;
       
+      const c1 = state.center1.num;
+      const c2 = state.center2.num;
+
+      const hand1 = state.hand1 || [];
+      const hand2 = state.hand2 || [];
+      const allHands = [...hand1, ...hand2];
+
+      // 両プレイヤーの手札の中に出せる札が1枚でもあるかチェック
+      const canAnyonePlay = allHands.some(card => canPlaySpeed(card.num, c1) || canPlaySpeed(card.num, c2));
+
+      if (canAnyonePlay) {
+        alert("⚠️ まだ出せるカードが手札に残っています！");
+        return;
+      }
+
       let d1 = [...(state.deck1 || [])];
       let d2 = [...(state.deck2 || [])];
 
-      if (d1.length > 0 && d2.length > 0) {
-        let updates = {
-          "speedState/center1": d1.shift(),
-          "speedState/center2": d2.shift(),
-          "speedState/deck1": d1,
-          "speedState/deck2": d2
-        };
+      if (d1.length > 0 || d2.length > 0) {
+        let updates = {};
+        if (d1.length > 0) {
+          updates["speedState/center1"] = d1.shift();
+          updates["speedState/deck1"] = d1;
+        }
+        if (d2.length > 0) {
+          updates["speedState/center2"] = d2.shift();
+          updates["speedState/deck2"] = d2;
+        }
         await update(ref(db, `rooms/${currentRoomId}`), updates);
       } else {
-        alert("山札がないためリセットできません！");
+        alert("両者の山札が無いため、手札のみで決着をつけてください！");
       }
     };
   </script>
@@ -522,43 +543,42 @@
       <div class="user-box">
         <div id="user-avatar" class="avatar">👤</div>
         <span id="user-name">未ログイン</span>
-        <span id="user-stats" class="stats-badge">勝率: 0.0%</span>
       </div>
-      <button id="login-btn">ログアウト</button>
+      <span id="user-stats" class="stats-badge">勝率: 0.0%</span>
     </div>
 
     <div class="card-panel">
       <!-- ロビー画面 -->
       <div id="lobby-area" class="lobby-container">
         <div class="lobby-box">
-          <h3 style="margin-top:0;">部屋を作成</h3>
+          <h4 style="margin: 0 0 10px 0;">部屋を作成</h4>
           <div class="input-group">
-            <label>部屋名（試合名）</label>
-            <input type="text" id="room-name" placeholder="例: 決勝戦！">
+            <input type="text" id="room-name" placeholder="部屋名（試合名）">
           </div>
           <div class="input-group">
-            <label>対戦パスワード (任意)</label>
-            <input type="password" id="room-pass" placeholder="合言葉">
+            <input type="password" id="room-pass" placeholder="パスワード (任意)">
           </div>
           <div class="input-group">
-            <label>ゲームの種類</label>
             <select id="game-type">
-              <option value="memory">🧠 神経衰弱 (Memory)</option>
               <option value="speed">⚡ スピード (Speed)</option>
+              <option value="memory">🧠 神経衰弱 (Memory)</option>
             </select>
           </div>
           <button onclick="createRoom()" style="width:100%;">作成して入室</button>
         </div>
 
         <div class="lobby-box">
-          <h3 style="margin-top:0;">対戦部屋一覧</h3>
+          <h4 style="margin: 0 0 8px 0;">対戦部屋一覧</h4>
+          <div class="search-box">
+            <input type="text" id="search-input" placeholder="🔍 部屋名で検索..." oninput="renderRoomList()">
+          </div>
           <div id="room-list"></div>
         </div>
       </div>
 
       <!-- ゲーム画面 -->
       <div id="game-area" class="game-board">
-        <button onclick="leaveRoom()" style="float:left; background:#555;">← 退出する</button>
+        <button onclick="leaveRoom()" style="float:left; background:#555; padding:6px 12px; font-size:12px;">← 退出</button>
         <div id="game-status" class="status-bar">対戦準備中...</div>
         
         <div class="score-board">
@@ -574,12 +594,12 @@
   <!-- 🔒 ログインモーダル -->
   <div id="login-modal" class="modal">
     <div class="modal-content">
-      <h2 style="margin: 0; color: #0088cc;">takei.net ログイン</h2>
-      <p style="font-size: 13px; color: #b0bec5; margin: 0;">ゲームを遊ぶにはSNSアカウントでのログインが必要です。</p>
+      <h3 style="margin: 0; color: #0088cc;">takei.net ログイン</h3>
+      <p style="font-size: 12px; color: #b0bec5; margin: 0;">ゲームを遊ぶにはログインが必要です。</p>
       <div id="login-error" style="color: #ff5252; font-size: 12px; min-height: 16px;"></div>
       <input type="email" id="email" placeholder="メールアドレス (@takei.net)">
       <input type="password" id="password" placeholder="パスワード">
-      <button onclick="login()" style="padding: 12px; font-size: 16px; margin-top: 8px;">ログインして開始</button>
+      <button onclick="login()" style="padding: 12px; font-size: 16px; margin-top: 6px;">ログインして開始</button>
     </div>
   </div>
 
