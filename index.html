@@ -41,7 +41,7 @@
     .status-bar { font-size: 16px; font-weight: bold; margin-bottom: 10px; color: #ffca28; min-height: 24px; }
     
     /* トランプ共通スタイル */
-    .card-base { width: 58px; height: 82px; border-radius: 6px; display: flex; justify-content: center; align-items: center; font-size: 18px; font-weight: bold; user-select: none; border: 2px solid #ddd; box-shadow: 0 3px 6px rgba(0,0,0,0.3); background: white; color: black; }
+    .card-base { width: 58px; height: 82px; border-radius: 6px; display: flex; justify-content: center; align-items: center; font-size: 18px; font-weight: bold; user-select: none; border: 2px solid #ddd; box-shadow: 0 3px 6px rgba(0,0,0,0.3); background: white; color: black; position: relative; }
     @media (min-width: 400px) { .card-base { width: 68px; height: 96px; font-size: 22px; } }
     .card-base.red { color: #d32f2f; }
 
@@ -59,8 +59,14 @@
     /* ⚡ スピード専用スマホ表示 */
     .speed-board { display: flex; flex-direction: column; gap: 12px; align-items: center; }
     .center-table { display: flex; gap: 15px; background: #1b4d3e; padding: 12px 18px; border-radius: 12px; align-items: center; box-shadow: inset 0 0 10px rgba(0,0,0,0.6); }
-    .hand-area { display: flex; gap: 8px; justify-content: center; min-height: 90px; }
+    .hand-area { display: flex; gap: 12px; justify-content: center; min-height: 100px; padding: 10px 0; }
     
+    /* 手札で同数字を重ねるスタイル */
+    .card-group { position: relative; display: flex; }
+    .card-group .speed-card { margin-left: -28px; transition: transform 0.2s ease, margin-left 0.2s ease; }
+    .card-group .speed-card:first-child { margin-left: 0; }
+    .card-group:hover .speed-card { margin-left: -10px; }
+
     .speed-card { cursor: pointer; transition: transform 0.15s ease-out, box-shadow 0.15s; }
     .speed-card:active { transform: scale(1.1) translateY(-10px); }
     .speed-card.pop-anim { animation: cardPop 0.25s ease-out; }
@@ -68,7 +74,7 @@
     /* アニメーション定義 */
     @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
     @keyframes matchDisappear { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.2); opacity: 0.8; } 100% { transform: scale(0); opacity: 0; visibility: hidden; } }
-    @keyframes cardPop { 0% { transform: scale(0.6); opacity: 0.3; } 70% { transform: scale(1.1); } 100% { transform: scale(1); opacity: 1; } }
+    @keyframes cardPop { 0% { transform: scale(0.5) translateY(20px); opacity: 0.3; } 70% { transform: scale(1.1); } 100% { transform: scale(1) translateY(0); opacity: 1; } }
 
     /* モーダル */
     .modal { display: flex; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); justify-content: center; align-items: center; z-index: 9999; }
@@ -173,7 +179,6 @@
       });
     }
 
-    // 🔎 部屋名リアルタイム検索フィルタリング
     window.renderRoomList = () => {
       const roomsContainer = document.getElementById("room-list");
       const searchQuery = document.getElementById("search-input").value.toLowerCase();
@@ -292,6 +297,7 @@
       return deck.sort(() => Math.random() - 0.5);
     }
 
+    // 🎴 トランプ52枚（各数字4枚）の正確なデッキ生成
     function initSpeedGame() {
       const suits = ['♠', '♥', '♦', '♣'];
       let deck = [];
@@ -397,7 +403,7 @@
       }
     }
 
-    // ⚡ スピードボード描画
+    // ⚡ スピードボード描画（手札での同数字重ねあわせ表示対応）
     function renderSpeedBoard(room) {
       const container = document.getElementById("game-container");
       container.className = "speed-board";
@@ -426,12 +432,27 @@
       `;
 
       const handArea = document.getElementById("my-hand-area");
+      
+      // 手札の中で同じ数字を持つカードをグループ化（重ねて表示）
+      const grouped = {};
       myHand.forEach((card, idx) => {
-        const cEl = document.createElement("div");
-        cEl.className = `card-base speed-card ${isRed(card)}`;
-        cEl.innerText = formatCard(card);
-        cEl.onclick = () => handleSpeedPlay(idx, room);
-        handArea.appendChild(cEl);
+        if (!grouped[card.num]) grouped[card.num] = [];
+        grouped[card.num].push({ card, idx });
+      });
+
+      Object.values(grouped).forEach(group => {
+        const groupEl = document.createElement("div");
+        groupEl.className = "card-group";
+
+        group.forEach(item => {
+          const cEl = document.createElement("div");
+          cEl.className = `card-base speed-card ${isRed(item.card)}`;
+          cEl.innerText = formatCard(item.card);
+          cEl.onclick = () => handleSpeedPlay(item.idx, room);
+          groupEl.appendChild(cEl);
+        });
+
+        handArea.appendChild(groupEl);
       });
     }
 
@@ -442,7 +463,7 @@
       return `${card.suit}${n}`; 
     }
 
-    // ⚡ カード提出・同じ数字の重ね出し・勝利判定
+    // ⚡ カード提出・場札重ね出し禁止の厳密チェック・手札0枚で勝利
     async function handleSpeedPlay(handIdx, room) {
       if (isSpectator || room.status !== "playing") return;
 
@@ -453,13 +474,14 @@
       const playedCard = myHand[handIdx];
 
       let targetCenter = null;
-      // ① 隣接する数字（前後1）または ② 同じ数字（重ね出し）が出せるかチェック
-      if (canPlaySpeed(playedCard.num, state.center1.num)) targetCenter = "center1";
-      else if (canPlaySpeed(playedCard.num, state.center2.num)) targetCenter = "center2";
+      // 台札に出せる条件: 前後の数字（±1、1↔13）のみ！同じ数字の重ね出しは禁止
+      if (canPlaySpeedStrict(playedCard.num, state.center1.num)) targetCenter = "center1";
+      else if (canPlaySpeedStrict(playedCard.num, state.center2.num)) targetCenter = "center2";
 
       if (targetCenter) {
         myHand.splice(handIdx, 1);
-        // 山札が残っている場合のみ自動で手札へ補填
+        
+        // 山札がある場合のみ手札へ1枚追加
         if (myDeck.length > 0) {
           myHand.push(myDeck.shift());
         }
@@ -470,7 +492,7 @@
           [`speedState/${isHost ? 'deck1' : 'deck2'}`]: myDeck
         };
 
-        // 🏆 勝利条件：手札が先に0枚になったプレイヤーの勝ち！
+        // 🏆 先に手札がなくなったプレイヤーの勝利！
         if (myHand.length === 0 && !gameEnded) {
           gameEnded = true;
           const winner = currentUser.uid;
@@ -486,16 +508,15 @@
       }
     }
 
-    // 出せる条件：前後1の数字 または 同じ数字の重ね出し
-    function canPlaySpeed(cardNum, centerNum) {
-      if (cardNum === centerNum) return true; // 同じ数字の重ね出し
+    // 台札へ出せるか（前後1の数字のみ、同じ数字は不可）
+    function canPlaySpeedStrict(cardNum, centerNum) {
       const diff = Math.abs(cardNum - centerNum);
       if (diff === 1) return true;
       if ((cardNum === 1 && centerNum === 13) || (cardNum === 13 && centerNum === 1)) return true;
       return false;
     }
 
-    // 🛑 手詰まり時のリセット機能（両者の手札に出せるカードがないか検証）
+    // 🛑 リセット（押したときに両プレイヤーの手札に出せる札がないか正確にチェック）
     window.resetSpeedCenter = async () => {
       const snap = await get(ref(db, `rooms/${currentRoomId}`));
       const room = snap.val();
@@ -508,11 +529,11 @@
       const hand2 = state.hand2 || [];
       const allHands = [...hand1, ...hand2];
 
-      // 両プレイヤーの手札の中に出せる札が1枚でもあるかチェック
-      const canAnyonePlay = allHands.some(card => canPlaySpeed(card.num, c1) || canPlaySpeed(card.num, c2));
+      // 全手札の中で、台札1または台札2に出せるカードが存在するか確認
+      const canAnyonePlay = allHands.some(card => canPlaySpeedStrict(card.num, c1) || canPlaySpeedStrict(card.num, c2));
 
       if (canAnyonePlay) {
-        alert("⚠️ まだ出せるカードが手札に残っています！");
+        alert("⚠️ まだ出せるカードがどちらかの手札に残っています！");
         return;
       }
 
@@ -531,7 +552,7 @@
         }
         await update(ref(db, `rooms/${currentRoomId}`), updates);
       } else {
-        alert("両者の山札が無いため、手札のみで決着をつけてください！");
+        alert("両者の山札が無いため、手札だけで決着をつけてください！");
       }
     };
   </script>
