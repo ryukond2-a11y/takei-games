@@ -60,15 +60,15 @@
     /* ⚡ スピード専用スマホ表示 */
     .speed-board { display: flex; flex-direction: column; gap: 10px; align-items: center; }
     .center-table { display: flex; gap: 12px; background: #1b4d3e; padding: 10px 16px; border-radius: 12px; align-items: center; box-shadow: inset 0 0 10px rgba(0,0,0,0.6); }
-    .hand-area { display: flex; gap: 8px; justify-content: center; min-height: 90px; padding: 6px 0; }
+    .hand-area { display: flex; gap: 12px; justify-content: center; min-height: 90px; padding: 6px 0; }
     
     /* 手札で同数字を重ねるスタイル */
-    .card-group { position: relative; display: flex; }
-    .card-group .speed-card { margin-left: -28px; transition: transform 0.2s ease, margin-left 0.2s ease; }
-    .card-group .speed-card:first-child { margin-left: 0; }
-    .card-group:hover .speed-card { margin-left: -8px; }
+    .card-group { position: relative; display: flex; cursor: pointer; }
+    .card-group .speed-card { transition: transform 0.2s ease, margin-left 0.2s ease; }
+    .card-group .speed-card:not(:first-child) { margin-left: -32px; }
+    .card-group:hover .speed-card:not(:first-child) { margin-left: -12px; }
 
-    .speed-card { cursor: pointer; transition: transform 0.15s ease-out, box-shadow 0.15s; }
+    .speed-card { transition: transform 0.15s ease-out, box-shadow 0.15s; }
     .speed-card:active { transform: scale(1.1) translateY(-8px); }
     .speed-card.pop-anim { animation: cardPop 0.25s ease-out; }
 
@@ -243,7 +243,7 @@
       }
 
       await set(ref(db, `rooms/${roomId}`), initialData);
-      joinRoom(roomId, false, pass, true); // ⭐ 作成時は pass チェックを直接スキップ
+      joinRoom(roomId, false, pass, true);
     };
 
     window.joinRoom = async (roomId, spectator = false, roomPass = "", isCreator = false) => {
@@ -251,7 +251,6 @@
       const room = snap.val();
       if (!room) return alert("部屋が存在しません");
 
-      // ⭐ 作成者または観戦者の場合はパスワードチェックをスキップ
       if (room.pass && !spectator && !isCreator && room.host !== currentUser.uid) {
         const pass = prompt("パスワードを入力してください");
         if (pass !== room.pass) return alert("パスワードが違います");
@@ -406,7 +405,7 @@
       }
     }
 
-    // ⚡ スピードボード描画（観戦者は全公開・操作不可）
+    // ⚡ スピードボード描画（同数字を厳密に1枠にまとめて重ねる）
     function renderSpeedBoard(room) {
       const container = document.getElementById("game-container");
       container.className = "speed-board";
@@ -418,23 +417,22 @@
       const isHost = currentUser.uid === room.host;
 
       if (isSpectator) {
-        // 👀 観戦モード：両方の手札を完全オープン表示
         const hHand = state.hand1 || [];
         const hDeck = state.deck1 || [];
         const gHand = state.hand2 || [];
         const gDeck = state.deck2 || [];
 
         container.innerHTML = `
-          <div style="font-size:13px; font-weight:bold; color:#81d4fa;">🏠 ホスト (${room.hostName}) の手札 (山札: ${hDeck.length}枚)</div>
-          <div class="hand-area">${renderHandHTML(hHand, true)}</div>
+          <div style="font-size:13px; font-weight:bold; color:#81d4fa;">🏠 ホスト (${room.hostName}) 手札: ${hHand.length}枚 (山札: ${hDeck.length}枚)</div>
+          <div class="hand-area">${renderGroupedHandHTML(hHand, true)}</div>
 
           <div class="center-table">
             <div><span style="font-size:11px; color:#aaa;">台札1</span><div class="card-base ${isRed(state.center1)}">${formatCard(state.center1)}</div></div>
             <div><span style="font-size:11px; color:#aaa;">台札2</span><div class="card-base ${isRed(state.center2)}">${formatCard(state.center2)}</div></div>
           </div>
 
-          <div style="font-size:13px; font-weight:bold; color:#ffb74d;">⚔️ ゲスト (${room.guestName || '待機中'}) の手札 (山札: ${gDeck.length}枚)</div>
-          <div class="hand-area">${renderHandHTML(gHand, true)}</div>
+          <div style="font-size:13px; font-weight:bold; color:#ffb74d;">⚔️ ゲスト (${room.guestName || '待機中'}) 手札: ${gHand.length}枚 (山札: ${gDeck.length}枚)</div>
+          <div class="hand-area">${renderGroupedHandHTML(gHand, true)}</div>
         `;
         return;
       }
@@ -454,41 +452,52 @@
           <button onclick="resetSpeedCenter()" class="reset-btn">手詰まり<br>リセット</button>
         </div>
 
-        <div style="font-size:13px; font-weight:bold;">あなたの手札 (残山札: ${myDeck.length}枚)</div>
+        <div style="font-size:13px; font-weight:bold;">あなたの手札: ${myHand.length}枚 (残山札: ${myDeck.length}枚)</div>
         <div class="hand-area" id="my-hand-area"></div>
       `;
 
       const handArea = document.getElementById("my-hand-area");
       
-      // 手札の中で同じ数字を持つカードをグループ化
+      // 手札の数字ごとにグルーピング
       const grouped = {};
       myHand.forEach((card, idx) => {
         if (!grouped[card.num]) grouped[card.num] = [];
         grouped[card.num].push({ card, idx });
       });
 
+      // 同数字カードグループをレンダリング（1枠扱いとしてまとめて出す）
       Object.values(grouped).forEach(group => {
         const groupEl = document.createElement("div");
         groupEl.className = "card-group";
 
-        // 同じ数字が複数ある場合の同時出し用インデックス配列
         const sameNumIndices = group.map(item => item.idx);
 
-        group.forEach(item => {
+        group.forEach((item, gIdx) => {
           const cEl = document.createElement("div");
           cEl.className = `card-base speed-card ${isRed(item.card)}`;
           cEl.innerText = formatCard(item.card);
-          // 1枚タップで同じ数字をすべて（重ねて）出すロジック
-          cEl.onclick = () => handleSpeedPlay(sameNumIndices, room);
           groupEl.appendChild(cEl);
         });
 
+        // 1回タップでその数字枠（複数枚あっても一気に1枚扱いとして提出）
+        groupEl.onclick = () => handleSpeedPlay(sameNumIndices, room);
         handArea.appendChild(groupEl);
       });
     }
 
-    function renderHandHTML(handCards, isDisable = false) {
-      return handCards.map(c => `<div class="card-base ${isRed(c)} ${isDisable ? 'disabled' : ''}">${formatCard(c)}</div>`).join('');
+    function renderGroupedHandHTML(handCards, isDisable = false) {
+      if (!handCards || handCards.length === 0) return '<div style="font-size:12px; color:#aaa;">なし</div>';
+      const grouped = {};
+      handCards.forEach((card) => {
+        if (!grouped[card.num]) grouped[card.num] = [];
+        grouped[card.num].push(card);
+      });
+
+      return Object.values(grouped).map(group => {
+        return `<div class="card-group">` + 
+          group.map(c => `<div class="card-base ${isRed(c)} ${isDisable ? 'disabled' : ''}">${formatCard(c)}</div>`).join('') +
+          `</div>`;
+      }).join('');
     }
 
     function isRed(card) { return card && (card.suit === '♥' || card.suit === '♦') ? 'red' : ''; }
@@ -498,7 +507,7 @@
       return `${card.suit}${n}`; 
     }
 
-    // ⚡ カード提出（同数字同時出し・補充判定・勝利判定）
+    // ⚡ カード提出ロジック（山札切れ後は補充せず手札を減らす）
     async function handleSpeedPlay(indicesToPlay, room) {
       if (isSpectator || room.status !== "playing") return;
 
@@ -514,18 +523,16 @@
       else if (canPlaySpeedStrict(firstCard.num, state.center2.num)) targetCenter = "center2";
 
       if (targetCenter) {
-        // 出すカード（同数字1枚または複数枚）を取り除く
-        // 降順にソートして削除時のインデックスズレを回避
+        // 出す対象のインデックスを降順ソートして安全に削除
         const sortedIndices = [...indicesToPlay].sort((a, b) => b - a);
         const playedCards = [];
         sortedIndices.forEach(idx => {
           playedCards.push(myHand.splice(idx, 1)[0]);
         });
 
-        // 台札の1番上に重ねるカード（最後に処理されるカード）
         const topPlayedCard = playedCards[0];
 
-        // 山札がある場合のみ、減った分だけ補填（最大4枚まで）
+        // 山札が残っている場合のみ補充（手札が4枚未満かつ山札がある場合）
         while (myHand.length < 4 && myDeck.length > 0) {
           myHand.push(myDeck.shift());
         }
@@ -536,7 +543,7 @@
           [`speedState/${isHost ? 'deck1' : 'deck2'}`]: myDeck
         };
 
-        // 🏆 先に手札がなくなったプレイヤーの勝利！
+        // 🏆 先に手札が0枚になったプレイヤーの勝利！
         if (myHand.length === 0 && !gameEnded) {
           gameEnded = true;
           const winner = currentUser.uid;
@@ -559,7 +566,7 @@
       return false;
     }
 
-    // 🛑 リセット（押したときに両プレイヤーの手札に出せる札がないか正確にチェック）
+    // 🛑 リセット機能
     window.resetSpeedCenter = async () => {
       if (isSpectator) return;
       const snap = await get(ref(db, `rooms/${currentRoomId}`));
@@ -573,7 +580,6 @@
       const hand2 = state.hand2 || [];
       const allHands = [...hand1, ...hand2];
 
-      // 全手札の中で、台札1または台札2に出せるカードが存在するか確認
       const canAnyonePlay = allHands.some(card => canPlaySpeedStrict(card.num, c1) || canPlaySpeedStrict(card.num, c2));
 
       if (canAnyonePlay) {
