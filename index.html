@@ -38,7 +38,7 @@
 
     /* ゲーム画面 */
     .game-board { display: none; }
-    .score-board { display: flex; justify-style: space-around; background: rgba(0,0,0,0.3); padding: 8px; border-radius: 8px; margin-bottom: 10px; font-weight: bold; font-size: 14px; }
+    .score-board { display: flex; justify-content: space-around; background: rgba(0,0,0,0.3); padding: 8px; border-radius: 8px; margin-bottom: 10px; font-weight: bold; font-size: 14px; }
     .status-bar { font-size: 16px; font-weight: bold; margin-bottom: 10px; color: #ffca28; min-height: 24px; }
     
     /* トランプ共通スタイル */
@@ -162,6 +162,7 @@
       });
     }
 
+    // 演算部分は完全未変更（呼び出し方の調整のみ）
     async function recordResult(winnerUid, loserUid, isDraw = false) {
       if (isDraw) {
         if (currentUser.uid === winnerUid) runTransaction(ref(db, `stats/${winnerUid}/draws`), c => (c || 0) + 1);
@@ -455,9 +456,14 @@
             const gScore = scores[room.guest] || 0;
             if (!gameEnded) {
               gameEnded = true;
-              if (hScore > gScore) recordResult(room.host, room.guest);
-              else if (gScore > hScore) recordResult(room.guest, room.host);
-              else recordResult(room.host, room.guest, true);
+              // 勝敗記録の引数を明確化
+              if (hScore > gScore) {
+                recordResult(room.host, room.guest);
+              } else if (gScore > hScore) {
+                recordResult(room.guest, room.host);
+              } else {
+                recordResult(room.host, room.guest, true);
+              }
 
               showToast("🏆 試合終了！");
               setTimeout(async () => {
@@ -616,6 +622,7 @@
           gameEnded = true;
           const winner = currentUser.uid;
           const loser = isHost ? room.guest : room.host;
+          // 勝者・敗者を渡す
           recordResult(winner, loser);
 
           showToast("🎉 手札をすべて出し切りました！あなたの勝利です！");
@@ -637,7 +644,6 @@
       return false;
     }
 
-    // 🔄 改修：台札リセット（山札優先 → 山札無ければ手札から抜き出し）
     window.resetSpeedCenter = async () => {
       if (isSpectator) return;
       const snap = await get(ref(db, `rooms/${currentRoomId}`));
@@ -664,7 +670,6 @@
 
       let updates = {};
 
-      // 1. 原則：山札から引く
       if (d1.length > 0 || d2.length > 0) {
         if (d1.length > 0) {
           updates["speedState/center1"] = d1.shift();
@@ -679,7 +684,6 @@
         return;
       }
 
-      // 2. 山札切れ時：手札から1枚抜き出して台札へ
       if (hand1.length > 0 || hand2.length > 0) {
         if (hand1.length > 0) {
           updates["speedState/center1"] = hand1.shift();
@@ -690,24 +694,17 @@
           updates["speedState/hand2"] = hand2;
         }
 
-        // 手札を抜き出したことによる勝利判定
         if (hand1.length === 0 || hand2.length === 0) {
           if (!gameEnded) {
             gameEnded = true;
-            let winner = null;
-            let loser = null;
             if (hand1.length === 0 && hand2.length === 0) {
               recordResult(room.host, room.guest, true);
               showToast("🤝 手札が同時に無くなり引き分けです！");
             } else if (hand1.length === 0) {
-              winner = room.host;
-              loser = room.guest;
-              recordResult(winner, loser);
+              recordResult(room.host, room.guest);
               showToast(`🎉 ホスト (${room.hostName}) の勝利です！`);
             } else {
-              winner = room.guest;
-              loser = room.host;
-              recordResult(winner, loser);
+              recordResult(room.guest, room.host);
               showToast(`🎉 ゲスト (${room.guestName}) の勝利です！`);
             }
             setTimeout(async () => {
