@@ -38,7 +38,7 @@
 
     /* ゲーム画面 */
     .game-board { display: none; }
-    .score-board { display: flex; justify-content: space-around; background: rgba(0,0,0,0.3); padding: 8px; border-radius: 8px; margin-bottom: 10px; font-weight: bold; font-size: 14px; }
+    .score-board { display: flex; justify-style: space-around; background: rgba(0,0,0,0.3); padding: 8px; border-radius: 8px; margin-bottom: 10px; font-weight: bold; font-size: 14px; }
     .status-bar { font-size: 16px; font-weight: bold; margin-bottom: 10px; color: #ffca28; min-height: 24px; }
     
     /* トランプ共通スタイル */
@@ -261,7 +261,6 @@
       showToast("部屋を削除しました");
     };
 
-    // 安全に配列化して固有数字の枠数を計算
     function getUniqueSlotCount(hand) {
       const safeHand = Array.isArray(hand) ? hand : [];
       return new Set(safeHand.map(c => c && c.num)).size;
@@ -473,7 +472,6 @@
       }
     }
 
-    // ⚡ スピードボード描画
     function renderSpeedBoard(room) {
       const container = document.getElementById("game-container");
       container.className = "speed-board";
@@ -484,7 +482,6 @@
 
       const isHost = currentUser.uid === room.host;
 
-      // 配列でない場合は空配列でフォールバック
       const hHand = Array.isArray(state.hand1) ? state.hand1 : [];
       const hDeck = Array.isArray(state.deck1) ? state.deck1 : [];
       const gHand = Array.isArray(state.hand2) ? state.hand2 : [];
@@ -506,7 +503,6 @@
         return;
       }
 
-      // ⚔️ プレイヤーモード
       const myHand = isHost ? hHand : gHand;
       const myDeck = isHost ? hDeck : gDeck;
       const oppHand = isHost ? gHand : hHand;
@@ -575,14 +571,12 @@
       return `${card.suit}${n}`; 
     }
 
-    // ⚡ カード提出ロジック（安全処理＆山札切れ完全対応）
     async function handleSpeedPlay(indicesToPlay, room) {
       if (isSpectator || room.status !== "playing") return;
 
       const isHost = currentUser.uid === room.host;
       const state = room.speedState || {};
 
-      // 🛡️ state の各配列を確実に配列として参照（is not iterable エラーを完全に防ぐ）
       let myHand = isHost ? (Array.isArray(state.hand1) ? [...state.hand1] : []) : (Array.isArray(state.hand2) ? [...state.hand2] : []);
       let myDeck = isHost ? (Array.isArray(state.deck1) ? [...state.deck1] : []) : (Array.isArray(state.deck2) ? [...state.deck2] : []);
 
@@ -595,7 +589,6 @@
       else if (state.center2 && canPlaySpeedStrict(firstCard.num, state.center2.num)) targetCenter = "center2";
 
       if (targetCenter) {
-        // インデックスが大きい順から取り除くことで配列ずれを防止
         const sortedIndices = [...indicesToPlay].sort((a, b) => b - a);
         const playedCards = [];
         sortedIndices.forEach(idx => {
@@ -606,7 +599,6 @@
         if (playedCards.length === 0) return;
         const topPlayedCard = playedCards[0];
 
-        // 🛡️ 山札が残っている時だけ手札に補充（山札が無ければ0〜3枚のままでもカードを出して進められる）
         while (getUniqueSlotCount(myHand) < 4 && myDeck.length > 0) {
           const drawnCard = myDeck.shift();
           if (drawnCard) {
@@ -645,6 +637,7 @@
       return false;
     }
 
+    // 🔄 改修：台札リセット（山札優先 → 山札無ければ手札から抜き出し）
     window.resetSpeedCenter = async () => {
       if (isSpectator) return;
       const snap = await get(ref(db, `rooms/${currentRoomId}`));
@@ -655,8 +648,8 @@
       const c1 = state.center1 ? state.center1.num : null;
       const c2 = state.center2 ? state.center2.num : null;
 
-      const hand1 = Array.isArray(state.hand1) ? state.hand1 : [];
-      const hand2 = Array.isArray(state.hand2) ? state.hand2 : [];
+      let hand1 = Array.isArray(state.hand1) ? [...state.hand1] : [];
+      let hand2 = Array.isArray(state.hand2) ? [...state.hand2] : [];
       const allHands = [...hand1, ...hand2];
 
       const canAnyonePlay = allHands.some(card => card && (canPlaySpeedStrict(card.num, c1) || canPlaySpeedStrict(card.num, c2)));
@@ -669,8 +662,10 @@
       let d1 = Array.isArray(state.deck1) ? [...state.deck1] : [];
       let d2 = Array.isArray(state.deck2) ? [...state.deck2] : [];
 
+      let updates = {};
+
+      // 1. 原則：山札から引く
       if (d1.length > 0 || d2.length > 0) {
-        let updates = {};
         if (d1.length > 0) {
           updates["speedState/center1"] = d1.shift();
           updates["speedState/deck1"] = d1;
@@ -680,9 +675,52 @@
           updates["speedState/deck2"] = d2;
         }
         await update(ref(db, `rooms/${currentRoomId}`), updates);
-        showToast("🔄 台札をリセットしました");
+        showToast("🔄 山札から台札をリセットしました");
+        return;
+      }
+
+      // 2. 山札切れ時：手札から1枚抜き出して台札へ
+      if (hand1.length > 0 || hand2.length > 0) {
+        if (hand1.length > 0) {
+          updates["speedState/center1"] = hand1.shift();
+          updates["speedState/hand1"] = hand1;
+        }
+        if (hand2.length > 0) {
+          updates["speedState/center2"] = hand2.shift();
+          updates["speedState/hand2"] = hand2;
+        }
+
+        // 手札を抜き出したことによる勝利判定
+        if (hand1.length === 0 || hand2.length === 0) {
+          if (!gameEnded) {
+            gameEnded = true;
+            let winner = null;
+            let loser = null;
+            if (hand1.length === 0 && hand2.length === 0) {
+              recordResult(room.host, room.guest, true);
+              showToast("🤝 手札が同時に無くなり引き分けです！");
+            } else if (hand1.length === 0) {
+              winner = room.host;
+              loser = room.guest;
+              recordResult(winner, loser);
+              showToast(`🎉 ホスト (${room.hostName}) の勝利です！`);
+            } else {
+              winner = room.guest;
+              loser = room.host;
+              recordResult(winner, loser);
+              showToast(`🎉 ゲスト (${room.guestName}) の勝利です！`);
+            }
+            setTimeout(async () => {
+              await remove(ref(db, `rooms/${currentRoomId}`));
+            }, 2000);
+            return;
+          }
+        }
+
+        await update(ref(db, `rooms/${currentRoomId}`), updates);
+        showToast("🔄 山札が無いため手札から1枚抜いて場を更新しました");
       } else {
-        showToast("両者の山札が無いため、手札だけで決着をつけてください！");
+        showToast("手札・山札ともに出せるカードがありません");
       }
     };
   </script>
