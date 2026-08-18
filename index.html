@@ -806,6 +806,36 @@
       <button onclick="login()" style="padding: 12px; font-size: 16px; margin-top: 6px;">ログインして開始</button>
     </div>
   </div>
+<!-- 🔐 ログイン / サインアップ モーダル -->
+  <div id="login-modal" class="modal">
+    <div class="modal-content">
+      <h3 style="margin: 0 0 10px 0; font-size: 18px;">ログイン</h3>
+      <div id="login-error" style="color: #ff5252; font-size: 12px; min-height: 16px;"></div>
+      
+      <div class="input-group">
+        <input type="email" id="email" placeholder="メールアドレス">
+      </div>
+      <div class="input-group">
+        <input type="password" id="password" placeholder="パスワード">
+      </div>
 
+      <button onclick="login()" style="margin-top: 5px;">ログイン</button>
+      
+      <!-- ✨ ここにサインアップ画面への遷移ボタンを追加！ -->
+      <button onclick="goToSignUp()" style="background: #2e7d32; margin-top: 5px;">
+        ✨ 新規アカウント作成 (無料)
+      </button>
+    </div>
+  </div>
+  <div class="header">
+    <div class="user-box">
+      <div id="user-avatar" class="avatar">👤</div>
+      <span id="user-name">未ログイン</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <span id="user-stats" class="stats-badge">勝率: 0.0% (0勝 0敗)</span>
+      <button onclick="logout()" style="background: #555; padding: 4px 8px; font-size: 12px;">ログアウト</button>
+    </div>
+  </div>
 </body>
 </html>
