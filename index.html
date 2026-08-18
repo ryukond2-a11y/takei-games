@@ -685,16 +685,14 @@ if (cards.every(c => c.matched)) {
         };
 
         if (myHand.length === 0 && !gameEnded) {
-          gameEnded = true;
-          const winner = currentUser.uid;
-          const loser = isHost ? room.guest : room.host;
-          // 勝者・敗者を渡す
-          recordResult(winner, loser);
-
-          showToast("🎉 手札をすべて出し切りました！あなたの勝利です！");
-          setTimeout(async () => {
-            await remove(ref(db, `rooms/${currentRoomId}`));
-          }, 2000);
+  gameEnded = true;
+  const winner = currentUser.uid;
+  const loser = isHost ? room.guest : room.host;
+  recordResult(winner, loser, false, room);
+  showToast("🎉 手札をすべて出し切りました！あなたの勝利です！");
+  setTimeout(async () => {
+    await remove(ref(db, `rooms/${currentRoomId}`));
+  }, 2000);
           return;
         }
 
