@@ -100,17 +100,12 @@
 
     /* モーダル */
     .modal { display: flex; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); justify-content: center; align-items: center; z-index: 9999; }
-    .modal-content { background: #1c313a; padding: 25px; border-radius: 16px; display: flex; flex-direction: column; gap: 12px; width: 90%; max-width: 340px; box-shadow: 0 8px 24px rgba(0,0,0,0.8); }
-
-    /* モーダルのタブ切り替えスタイル */
-    .auth-tabs { display: flex; border-bottom: 2px solid #2c5364; margin-bottom: 5px; }
-    .auth-tab { flex: 1; padding: 8px; background: none; border: none; color: #81d4fa; font-size: 14px; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; border-radius: 0; }
-    .auth-tab.active { border-bottom-color: #0088cc; font-weight: bold; color: #ffffff; }
+    .modal-content { background: #1c313a; padding: 25px; border-radius: 16px; display: flex; flex-direction: column; gap: 12px; width: 90%; max-width: 320px; box-shadow: 0 8px 24px rgba(0,0,0,0.8); }
   </style>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { getAuth, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
     import { getDatabase, ref, set, get, onValue, update, remove, runTransaction } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
     const firebaseConfig = {
@@ -133,7 +128,6 @@
     let isSpectator = false;
     let gameEnded = false;
     let allRoomsCache = {};
-    let isSignUpMode = false;
 
     onAuthStateChanged(auth, async (user) => {
       currentUser = user;
@@ -168,7 +162,7 @@
       });
     }
 
-    // 演算部分は完全未変更
+    // 演算部分は完全未変更（呼び出し方の調整のみ）
     async function recordResult(winnerUid, loserUid, isDraw = false) {
       if (isDraw) {
         if (currentUser.uid === winnerUid) runTransaction(ref(db, `stats/${winnerUid}/draws`), c => (c || 0) + 1);
@@ -201,61 +195,13 @@
       });
     }
 
-    window.switchAuthMode = (mode) => {
-      isSignUpMode = (mode === 'signup');
-      document.getElementById("tab-login").classList.toggle("active", !isSignUpMode);
-      document.getElementById("tab-signup").classList.toggle("active", isSignUpMode);
-      document.getElementById("auth-submit-btn").innerText = isSignUpMode ? "アカウントを作成" : "ログインして開始";
-      document.getElementById("login-error").innerText = "";
-    };
-
-    window.handleAuth = async () => {
-      const email = document.getElementById("email").value.trim();
+    window.login = async () => {
+      const email = document.getElementById("email").value;
       const pass = document.getElementById("password").value;
-      const errorEl = document.getElementById("login-error");
-      errorEl.innerText = "";
-
-      if (!email || !pass) {
-        errorEl.innerText = "メールアドレスとパスワードを入力してください";
-        return;
-      }
-
-      if (isSignUpMode) {
-        try {
-          const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
-          const user = userCredential.user;
-          const defaultName = email.split('@')[0];
-
-          // 初期ユーザーデータと勝率データの作成
-          await set(ref(db, `users/${user.uid}`), {
-            email: email,
-            displayName: defaultName,
-            createdAt: Date.now()
-          });
-          await set(ref(db, `stats/${user.uid}`), {
-            wins: 0,
-            losses: 0,
-            draws: 0
-          });
-
-          showToast("アカウントが正常に作成されました！");
-        } catch (err) {
-          if (err.code === "auth/email-already-in-use") {
-            errorEl.innerText = "このメールアドレスは既に登録されています";
-          } else if (err.code === "auth/weak-password") {
-            errorEl.innerText = "パスワードは6文字以上で設定してください";
-          } else if (err.code === "auth/invalid-email") {
-            errorEl.innerText = "有効なメールアドレス形式を入力してください";
-          } else {
-            errorEl.innerText = "登録失敗: " + err.message;
-          }
-        }
-      } else {
-        try {
-          await signInWithEmailAndPassword(auth, email, pass);
-        } catch (err) { 
-          errorEl.innerText = "ログイン失敗: メール・パスワードを確認してください";
-        }
+      try {
+        await signInWithEmailAndPassword(auth, email, pass);
+      } catch (err) { 
+        document.getElementById("login-error").innerText = "ログイン失敗: メール・パスワードを確認してください";
       }
     };
 
@@ -510,6 +456,7 @@
             const gScore = scores[room.guest] || 0;
             if (!gameEnded) {
               gameEnded = true;
+              // 勝敗記録の引数を明確化
               if (hScore > gScore) {
                 recordResult(room.host, room.guest);
               } else if (gScore > hScore) {
@@ -675,6 +622,7 @@
           gameEnded = true;
           const winner = currentUser.uid;
           const loser = isHost ? room.guest : room.host;
+          // 勝者・敗者を渡す
           recordResult(winner, loser);
 
           showToast("🎉 手札をすべて出し切りました！あなたの勝利です！");
@@ -831,21 +779,15 @@
     </div>
   </div>
 
-  <!-- 🔒 認証モーダル (ログイン / サインアップ) -->
+  <!-- 🔒 ログインモーダル -->
   <div id="login-modal" class="modal">
     <div class="modal-content">
-      <div class="auth-tabs">
-        <button id="tab-login" class="auth-tab active" onclick="switchAuthMode('login')">ログイン</button>
-        <button id="tab-signup" class="auth-tab" onclick="switchAuthMode('signup')">サインアップ</button>
-      </div>
-
-      <p style="font-size: 12px; color: #b0bec5; margin: 0;">takei.net のアカウントで接続します。</p>
+      <h3 style="margin: 0; color: #0088cc;">takei.net ログイン</h3>
+      <p style="font-size: 12px; color: #b0bec5; margin: 0;">ゲームを遊ぶにはログインが必要です。</p>
       <div id="login-error" style="color: #ff5252; font-size: 12px; min-height: 16px;"></div>
-      
       <input type="email" id="email" placeholder="メールアドレス (@takei.net)">
-      <input type="password" id="password" placeholder="パスワード (6文字以上)">
-      
-      <button id="auth-submit-btn" onclick="handleAuth()" style="padding: 12px; font-size: 16px; margin-top: 6px;">ログインして開始</button>
+      <input type="password" id="password" placeholder="パスワード">
+      <button onclick="login()" style="padding: 12px; font-size: 16px; margin-top: 6px;">ログインして開始</button>
     </div>
   </div>
 
