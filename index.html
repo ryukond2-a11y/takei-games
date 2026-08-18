@@ -195,15 +195,20 @@
       });
     }
 
-    window.login = async () => {
-      const email = document.getElementById("email").value;
-      const pass = document.getElementById("password").value;
-      try {
-        await signInWithEmailAndPassword(auth, email, pass);
-      } catch (err) { 
-        document.getElementById("login-error").innerText = "ログイン失敗: メール・パスワードを確認してください";
-      }
-    };
+   window.login = async () => {
+  const loginInput = document.getElementById("email").value.trim();
+  const pass = document.getElementById("password").value;
+  const errorEl = document.getElementById("login-error");
+
+  // 💡 Gmailなどのフルアドレスの場合は、そのまま loginInput を渡す
+  try {
+    await signInWithEmailAndPassword(auth, loginInput, pass);
+    if (errorEl) errorEl.innerText = "";
+  } catch (err) {
+    console.error("エラー内容:", err.code, err.message);
+    if (errorEl) errorEl.innerText = "ログインに失敗しました";
+  }
+};
 
     function listenRoomList() {
       onValue(ref(db, "rooms"), (snapshot) => {
