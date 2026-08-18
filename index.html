@@ -511,27 +511,28 @@ async function recordResult(winnerUid, loserUid, isDraw = false, roomData = null
             nextTurn = room.host === currentUser.uid ? room.guest : room.host;
           }
 
-          if (cards.every(c => c.matched)) {
-            const hScore = scores[room.host] || 0;
-            const gScore = scores[room.guest] || 0;
-            if (!gameEnded) {
-              gameEnded = true;
-              // 勝敗記録の引数を明確化
-              if (hScore > gScore) {
-                recordResult(room.host, room.guest);
-              } else if (gScore > hScore) {
-                recordResult(room.guest, room.host);
-              } else {
-                recordResult(room.host, room.guest, true);
-              }
+if (cards.every(c => c.matched)) {
+  const hScore = scores[room.host] || 0;
+  const gScore = scores[room.guest] || 0;
+  if (!gameEnded) {
+    gameEnded = true;
+    
+    // 💡 第4引数に room を追加して呼び出します
+    if (hScore > gScore) {
+      recordResult(room.host, room.guest, false, room);
+    } else if (gScore > hScore) {
+      recordResult(room.guest, room.host, false, room);
+    } else {
+      recordResult(room.host, room.guest, true, room);
+    }
 
-              showToast("🏆 試合終了！");
-              setTimeout(async () => {
-                await remove(ref(db, `rooms/${currentRoomId}`));
-              }, 2000);
-              return;
-            }
-          }
+    showToast("🏆 試合終了！");
+    setTimeout(async () => {
+      await remove(ref(db, `rooms/${currentRoomId}`));
+    }, 2000);
+    return;
+  }
+}
 
           await update(ref(db, `rooms/${currentRoomId}`), { cards: cards, turn: nextTurn, scores: scores });
         }, 800);
