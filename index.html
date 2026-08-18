@@ -247,7 +247,18 @@
         roomsContainer.appendChild(item);
       });
     };
-
+　　window.goToSignUp = () => {
+  // 現在のトランプゲームのURLを取得してリダイレクト用にパラメータ付与
+  const gameUrl = encodeURIComponent(window.location.href);
+  window.location.href = `signup.html?redirect=${gameUrl}`;
+};
+    window.logout = async () => {
+  if (confirm("ログアウトしますか？")) {
+    if (currentRoomId) leaveRoom();
+    await signOut(auth);
+    showToast("ログアウトしました");
+  }
+};
     window.deleteRoomPrompt = async (roomId, roomPass) => {
       if (roomPass) {
         const inputPass = prompt("部屋削除用のパスワードを入力してください:");
@@ -513,7 +524,12 @@
       const myDeck = isHost ? hDeck : gDeck;
       const oppHand = isHost ? gHand : hHand;
       const oppDeck = isHost ? gDeck : hDeck;
-
+      const avatarEl = document.getElementById("user-avatar");
+      if (profile.icon && profile.icon.startsWith("http")) {
+        avatarEl.innerHTML = `<img src="${profile.icon}" alt="avatar">`;
+      } else {
+        avatarEl.innerText = profile.icon || "🧪";
+      }
       container.innerHTML = `
         <div style="font-size:12px; color:#aaa;">相手手札: ${oppHand.length}枚 (${getUniqueSlotCount(oppHand)}枠) | 山札: ${oppDeck.length}枚</div>
         
