@@ -843,17 +843,7 @@ if (cards.every(c => c.matched)) {
     </div>
   </div>
 
-  <!-- 🔒 ログインモーダル -->
-  <div id="login-modal" class="modal">
-    <div class="modal-content">
-      <h3 style="margin: 0; color: #0088cc;">takei.net ログイン</h3>
-      <p style="font-size: 12px; color: #b0bec5; margin: 0;">ゲームを遊ぶにはログインが必要です。</p>
-      <div id="login-error" style="color: #ff5252; font-size: 12px; min-height: 16px;"></div>
-      <input type="email" id="email" placeholder="メールアドレス (@takei.net)">
-      <input type="password" id="login-password" placeholder="パスワード">
-      <button onclick="login()" style="padding: 12px; font-size: 16px; margin-top: 6px;">ログインして開始</button>
-    </div>
-  </div>
+
 <!-- 🔐 ログイン / サインアップ モーダル -->
   <div id="login-modal" class="modal">
     <div class="modal-content">
@@ -864,7 +854,7 @@ if (cards.every(c => c.matched)) {
         <input type="email" id="email" placeholder="メールアドレス">
       </div>
       <div class="input-group">
-        <input type="password" id="signup-password" placeholder="パスワード">
+        <input type="password" id="login-password" placeholder="パスワード">
       </div>
 
       <button onclick="login()" style="margin-top: 5px;">ログイン</button>
