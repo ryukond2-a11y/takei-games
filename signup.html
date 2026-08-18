@@ -172,76 +172,40 @@
       document.getElementById("file-name-display").innerText = fileName;
     };
 
-    window.handleSignUp = async () => {
-      const errorEl = document.getElementById("error-msg");
-      errorEl.innerText = "";
+// ログイン処理の関数
+window.handleLogin = async () => {
+  const loginInput = (document.getElementById("login-id") as HTMLInputElement).value.trim();
+  const passwordInput = (document.getElementById("password") as HTMLInputElement).value;
+  const errorEl = document.getElementById("error-msg");
 
-      const displayName = document.getElementById("display-name").value.trim();
-      const loginId = document.getElementById("login-id").value.trim().toLowerCase();
-      let email = document.getElementById("email").value.trim();
-      const password = document.getElementById("password").value;
-      const iconFile = document.getElementById("icon-file").files[0];
+  if (!loginInput) {
+    if (errorEl) errorEl.innerText = "ログインIDまたはメールアドレスを入力してください";
+    return;
+  }
+  if (!passwordInput) {
+    if (errorEl) errorEl.innerText = "パスワードを入力してください";
+    return;
+  }
 
-      if (!displayName) return errorEl.innerText = "表示名を入力してください";
-      if (!loginId) return errorEl.innerText = "ログインIDを入力してください";
-      if (!/^[a-z0-9_]+$/.test(loginId)) return errorEl.innerText = "ログインIDは半角英数字・アンダースコアのみ使用可能です";
-      if (!password || password.length < 6) return errorEl.innerText = "パスワードは6文字以上で入力してください";
+  // 💡 ここがポイント！
+  // 入力された文字に "@" が含まれていない場合、自動で `@takei.net` を補完する
+  let authEmail = loginInput;
+  if (!loginInput.includes("@")) {
+    authEmail = `${loginInput}@takei.net`;
+  }
 
-      if (!email) {
-        email = `${loginId}@takei.net`;
-      }
-
-      try {
-        const idSnap = await get(ref(db, `userIDs/${loginId}`));
-        if (idSnap.exists()) {
-          return errorEl.innerText = "このログインIDは既に使用されています";
-        }
-
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        const user = userCredential.user;
-
-        let iconUrl = "🧪";
-
-        if (iconFile) {
-          const fileRef = storageRef(storage, `avatars/${user.uid}`);
-          await uploadBytes(fileRef, iconFile);
-          iconUrl = await getDownloadURL(fileRef);
-        }
-
-        await set(ref(db, `users/${user.uid}`), {
-          uid: user.uid,
-          displayName: displayName,
-          loginId: loginId,
-          email: email,
-          icon: iconUrl,
-          createdAt: Date.now()
-        });
-
-        await set(ref(db, `userIDs/${loginId}`), user.uid);
-
-        await set(ref(db, `stats/${user.uid}`), {
-          wins: 0,
-          losses: 0,
-          draws: 0
-        });
-
-        alert("アカウント作成が完了しました！");
-        
-        // 元のゲーム画面（またはSNSトップ）へリダイレクト
-        if (redirectTarget) {
-          window.location.href = redirectTarget;
-        } else {
-          window.location.href = "index.html";
-        }
-
-      } catch (err) {
-        if (err.code === "auth/email-already-in-use") {
-          errorEl.innerText = "このメールアドレス（または生成された仮アドレス）は既に登録されています";
-        } else {
-          errorEl.innerText = "登録エラー: " + err.message;
-        }
-      }
-    };
+  try {
+    // 補完した email と password でログイン
+    await signInWithEmailAndPassword(auth, authEmail, passwordInput);
+    console.log("ログイン成功！");
+    // ログイン成功後の処理（ゲーム画面へ移動など）
+  } catch (err: any) {
+    console.error("ログインエラー:", err);
+    if (errorEl) {
+      errorEl.innerText = "IDまたはパスワードが正しくありません";
+    }
+  }
+};
   </script>
 </head>
 <body>
