@@ -403,27 +403,54 @@
       };
     }
 
-    function renderGame(room) {
-      const statusEl = document.getElementById("game-status");
-      const hostName = room.hostName;
-      const guestName = room.guestName || '対戦相手待ち...';
-      const hostScore = (room.scores && room.scores[room.host]) || 0;
-      const guestScore = (room.scores && room.guest && room.scores[room.guest]) || 0;
+function renderGame(room) {
+  const statusEl = document.getElementById("game-status");
+  const hostName = room.hostName;
+  const guestName = room.guestName || '対戦相手待ち...';
+  const hostScore = (room.scores && room.scores[room.host]) || 0;
+  const guestScore = (room.scores && room.guest && room.scores[room.guest]) || 0;
 
-      document.getElementById("p1-display").innerText = `🏠 ${hostName}: ${hostScore}点`;
-      document.getElementById("p2-display").innerText = `⚔️ ${guestName}: ${guestScore}点`;
+  document.getElementById("p1-display").innerText = `🏠 ${hostName}: ${hostScore}点`;
+  document.getElementById("p2-display").innerText = `⚔️ ${guestName}: ${guestScore}点`;
 
-      if (room.gameType === 'memory') {
-        const isMyTurn = room.turn === currentUser?.uid;
-        statusEl.innerText = room.status === "waiting" ? "対戦相手を待っています..." :
-          (isSpectator ? "👀 観戦中（操作不可）" : (isMyTurn ? "👑 あなたのターンです！" : "⏳ 相手の考え中..."));
-        renderMemoryBoard(room);
-      } else {
-        statusEl.innerText = room.status === "waiting" ? "対戦相手を待っています..." :
-          (isSpectator ? "👀 観戦中（両者の手札を表示中）" : "⚡ 手札を素早く出せ！");
-        renderSpeedBoard(room);
-      }
+  // ステータス表示の更新
+  if (room.gameType === 'memory') {
+    const isMyTurn = room.turn === currentUser?.uid;
+    statusEl.innerText = room.status === "waiting" ? "対戦相手を待っています..." :
+      (isSpectator ? "👀 観戦中（操作不可）" : (isMyTurn ? "👑 あなたのターンです！" : "⏳ 相手の考え中..."));
+    renderMemoryBoard(room);
+  } else {
+    statusEl.innerText = room.status === "waiting" ? "対戦相手を待っています..." :
+      (isSpectator ? "👀 観戦中（両者の手札を表示中）" : "⚡ 手札を素早く出せ！");
+    renderSpeedBoard(room);
+  }
+
+  // 💡 対戦相手を待っている時（waiting）だけ募集共有ボタンを表示挿入する
+  if (room.status === "waiting") {
+    const roomInviteUrl = `${window.location.origin}${window.location.pathname}?roomId=${currentRoomId}`;
+    const inviteText = `⚔️ トランプ対戦の相手を募集中！【部屋名: ${room.name}】（${room.gameType === 'speed' ? '⚡スピード' : '🧠神経衰弱'}）`;
+
+    const shareButtonsHtml = `
+      <div id="share-buttons-container" style="margin-top: 8px; display: flex; gap: 8px; justify-content: center;">
+        <button onclick="shareToTakeiNet('${inviteText} ${roomInviteUrl}')" style="background: #0088cc; font-size: 12px; padding: 6px 12px;">
+          🌐 takei.net plus に募集投稿
+        </button>
+        <button onclick="shareGeneral('${inviteText}', '${roomInviteUrl}')" style="background: #4caf50; font-size: 12px; padding: 6px 12px;">
+          🔗 部屋URLを共有
+        </button>
+      </div>
+    `;
+
+    // 既存のボタンが無ければ statusEl の後ろに追加
+    if (!document.getElementById("share-buttons-container")) {
+      statusEl.insertAdjacentHTML('afterend', shareButtonsHtml);
     }
+  } else {
+    // 対戦が始まったら募集ボタンを消す
+    const btnContainer = document.getElementById("share-buttons-container");
+    if (btnContainer) btnContainer.remove();
+  }
+}
 
     function renderMemoryBoard(room) {
       const container = document.getElementById("game-container");
@@ -762,6 +789,21 @@ window.shareGeneral = async (text, url = window.location.href) => {
     navigator.clipboard.writeText(`${text}\n${url}`);
     showToast("📋 共有リンクをクリップボードにコピーしました！");
   }
+};
+    // 勝敗結果を takei.net plus や一般的な共有へ飛ばす関数
+window.shareGameResult = (gameTypeName, resultType, opponentName) => {
+  const gameName = gameTypeName === 'speed' ? '⚡スピード' : '🧠神経衰弱';
+  let text = "";
+
+  if (resultType === 'win') {
+    text = `🏆 【勝利】${gameName}で ${opponentName} に見事勝利しました！！ #takeinet`;
+  } else if (resultType === 'lose') {
+    text = `😭 【敗北】${gameName}で ${opponentName} に敗北しました... 次は勝つ！ #takeinet`;
+  } else {
+    text = `🤝 【引き分け】${gameName}で ${opponentName} と熱戦の末引き分けました！ #takeinet`;
+  }
+
+  shareToTakeiNet(text);
 };
   </script>
 </head>
