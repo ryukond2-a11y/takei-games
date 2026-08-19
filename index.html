@@ -560,7 +560,7 @@ if (cards.every(c => c.matched)) {
       }
     }
 
-    function renderSpeedBoard(room) {
+function renderSpeedBoard(room) {
       const container = document.getElementById("game-container");
       container.className = "speed-board";
       container.innerHTML = "";
@@ -595,12 +595,17 @@ if (cards.every(c => c.matched)) {
       const myDeck = isHost ? hDeck : gDeck;
       const oppHand = isHost ? gHand : hHand;
       const oppDeck = isHost ? gDeck : hDeck;
+
+      // 💡 profileの処理は不要なため削除するか、以下のように安全に書き換えます
       const avatarEl = document.getElementById("user-avatar");
-      if (profile.icon && profile.icon.startsWith("http")) {
-        avatarEl.innerHTML = `<img src="${profile.icon}" alt="avatar">`;
-      } else {
-        avatarEl.innerText = profile.icon || "🧪";
+      if (avatarEl && typeof profile !== 'undefined' && profile.icon) {
+        if (profile.icon.startsWith("http")) {
+          avatarEl.innerHTML = `<img src="${profile.icon}" alt="avatar" style="width:100%;height:100%;border-radius:50%;">`;
+        } else {
+          avatarEl.innerText = profile.icon;
+        }
       }
+
       container.innerHTML = `
         <div style="font-size:12px; color:#aaa;">相手手札: ${oppHand.length}枚 (${getUniqueSlotCount(oppHand)}枠) | 山札: ${oppDeck.length}枚</div>
         
