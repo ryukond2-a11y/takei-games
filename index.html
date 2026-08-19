@@ -335,37 +335,52 @@ window.renderRoomList = function() {
     </div>
   `).join('');
 };
-　　window.goToSignUp = () => {
+window.goToSignUp = () => {
   // 現在のトランプゲームのURLを取得してリダイレクト用にパラメータ付与
   const gameUrl = encodeURIComponent(window.location.href);
   window.location.href = `signup.html?redirect=${gameUrl}`;
 };
-    window.logout = async (
-    window.deleteRoomPrompt = async (roomId, roomPass) => {
-      if (roomPass) {
-        const inputPass = prompt("部屋削除用のパスワードを入力してください:");
-        if (inputPass !== roomPass) {
-          showToast("パスワードが一致しないため削除できません");
-          return;
-        }
-      } else {
-        if (!confirm("本当にこの部屋を削除しますか？")) return;
-      }
-      await remove(ref(db, `rooms/${roomId}`));
-      showToast("部屋を削除しました");
-    };
 
-    function getUniqueSlotCount(hand) {
-      const safeHand = Array.isArray(hand) ? hand : [];
-      return new Set(safeHand.map(c => c && c.num)).size;
+// ⭕ 正しく関数を閉じるように修正
+window.logout = async () => {
+  if (confirm("ログアウトしますか？")) {
+    if (typeof currentRoomId !== 'undefined' && currentRoomId) leaveRoom();
+    
+    if (typeof signOut === 'function') {
+      await signOut(auth);
+    } else if (auth && typeof auth.signOut === 'function') {
+      await auth.signOut();
     }
+    
+    showToast("ログアウトしました");
+  }
+};
 
-    window.createRoom = async () => {
-      if (!currentUser) return showToast("ログインが必要です");
-      const roomName = document.getElementById("room-name").value || "対戦部屋";
-      const pass = document.getElementById("room-pass").value;
-      const gameType = document.getElementById("game-type").value;
-      const roomId = "room_" + Date.now();
+window.deleteRoomPrompt = async (roomId, roomPass) => {
+  if (roomPass) {
+    const inputPass = prompt("部屋削除用のパスワードを入力してください:");
+    if (inputPass !== roomPass) {
+      showToast("パスワードが一致しないため削除できません");
+      return;
+    }
+  } else {
+    if (!confirm("本当にこの部屋を削除しますか？")) return;
+  }
+  await remove(ref(db, `rooms/${roomId}`));
+  showToast("部屋を削除しました");
+};
+
+function getUniqueSlotCount(hand) {
+  const safeHand = Array.isArray(hand) ? hand : [];
+  return new Set(safeHand.map(c => c && c.num)).size;
+}
+
+window.createRoom = async () => {
+  if (!currentUser) return showToast("ログインが必要です");
+  const roomName = document.getElementById("room-name").value || "対戦部屋";
+  const pass = document.getElementById("room-pass").value;
+  const gameType = document.getElementById("game-type").value;
+  const roomId = "room_" + Date.now();
 
       let initialData = {
         id: roomId,
