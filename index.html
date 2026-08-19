@@ -134,20 +134,42 @@
       const modal = document.getElementById("login-modal");
 
       if (user) {
+        // 🟢 ログイン時
         modal.style.display = "none";
-        document.getElementById("main-content").style.pointerEvents = "auto";
-        document.getElementById("main-content").style.opacity = "1";
+        
+        // メイン画面を操作可能にする
+        const mainContent = document.getElementById("main-content");
+        if (mainContent) {
+          mainContent.style.pointerEvents = "auto";
+          mainContent.style.opacity = "1";
+        }
 
+        // ユーザー名の反映
         const snap = await get(ref(db, `users/${user.uid}`));
         const profile = snap.val() || {};
-        document.getElementById("user-name").innerText = profile.displayName || user.email.split('@')[0];
+        const userNameEl = document.getElementById("user-name");
+        if (userNameEl) {
+          userNameEl.innerText = profile.displayName || user.email.split('@')[0];
+        }
         
         loadUserStats(user.uid);
         listenRoomList();
       } else {
+        // 🔴 未ログイン時
+        // モーダルを表示
         modal.style.display = "flex";
-        document.getElementById("main-content").style.pointerEvents = "none";
-        document.getElementById("main-content").style.opacity = "0.3";
+        
+        // メイン画面は薄く表示（ボタンが押せるように pointerEvents は制限しない）
+        const mainContent = document.getElementById("main-content");
+        if (mainContent) {
+          mainContent.style.pointerEvents = "auto";
+          mainContent.style.opacity = "0.5";
+        }
+        
+        const userNameEl = document.getElementById("user-name");
+        if (userNameEl) {
+          userNameEl.innerText = "未ログイン";
+        }
       }
     });
 
