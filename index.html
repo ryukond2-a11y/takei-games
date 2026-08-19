@@ -291,17 +291,35 @@ window.renderRoomList = function() {
   const roomListEl = document.getElementById('room-list');
   if (!roomListEl) return;
 
-  // 💡 window.allRooms があればそれを使い、無ければ変数 rooms を使う安全設定
-  const targetRooms = window.allRooms || (typeof rooms !== 'undefined' ? rooms : []);
+  // 1. Firebase等から取得した raw データを取得
+  const rawRooms = window.allRooms || (typeof rooms !== 'undefined' ? rooms : null);
 
-  const filteredRooms = targetRooms.filter(room => {
+  if (!rawRooms) {
+    roomListEl.innerHTML = '<div style="color: #888; font-size: 13px; text-align: center; padding: 10px;">部屋がありません</div>';
+    return;
+  }
+
+  // 2. オブジェクト形式 { id1: room1, id2: room2 } だった場合も配列に変換
+  let roomArray = [];
+  if (Array.isArray(rawRooms)) {
+    roomArray = rawRooms;
+  } else if (typeof rawRooms === 'object') {
+    roomArray = Object.keys(rawRooms).map(key => ({
+      id: key,
+      ...rawRooms[key]
+    }));
+  }
+
+  // 3. 検索フィルタリング（空文字なら全件表示）
+  const filteredRooms = roomArray.filter(room => {
     if (!room) return false;
-    if (!searchKeyword) return true; // 未入力なら全部表示
+    if (!searchKeyword) return true; // 検索語句が無ければすべて表示
     
     const roomName = (room.name || '').toLowerCase();
     return roomName.includes(searchKeyword);
   });
 
+  // 4. レンダリング
   if (filteredRooms.length === 0) {
     roomListEl.innerHTML = '<div style="color: #888; font-size: 13px; text-align: center; padding: 10px;">部屋がありません</div>';
     return;
