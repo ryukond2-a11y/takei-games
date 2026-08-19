@@ -284,40 +284,39 @@ async function recordResult(winnerUid, loserUid, isDraw = false, roomData = null
       });
     }
 
-    window.renderRoomList = () => {
-      const roomsContainer = document.getElementById("room-list");
-      const searchQuery = document.getElementById("search-input").value.toLowerCase();
-      roomsContainer.innerHTML = "";
+window.renderRoomList = function() {
+  const searchInput = document.getElementById('search-input');
+  const searchKeyword = (searchInput ? searchInput.value : '').trim().toLowerCase();
+  
+  const roomListEl = document.getElementById('room-list');
+  if (!roomListEl) return;
 
-      const filtered = Object.values(allRoomsCache).filter(room => 
-        room.name.toLowerCase().includes(searchQuery)
-      );
+  // 💡 window.allRooms があればそれを使い、無ければ変数 rooms を使う安全設定
+  const targetRooms = window.allRooms || (typeof rooms !== 'undefined' ? rooms : []);
 
-      if (filtered.length === 0) {
-        roomsContainer.innerHTML = "<div style='color:#888; font-size:13px;'>条件に一致する部屋がありません</div>";
-        return;
-      }
+  const filteredRooms = targetRooms.filter(room => {
+    if (!room) return false;
+    if (!searchKeyword) return true; // 未入力なら全部表示
+    
+    const roomName = (room.name || '').toLowerCase();
+    return roomName.includes(searchKeyword);
+  });
 
-      filtered.forEach((room) => {
-        const item = document.createElement("div");
-        item.className = "room-item";
-        const isFull = room.guest ? true : false;
-        const isHost = room.host === currentUser.uid;
+  if (filteredRooms.length === 0) {
+    roomListEl.innerHTML = '<div style="color: #888; font-size: 13px; text-align: center; padding: 10px;">部屋がありません</div>';
+    return;
+  }
 
-        item.innerHTML = `
-          <div class="room-info">
-            <div class="room-name">${room.name} ${room.pass ? '🔒' : ''}</div>
-            <div class="room-meta">ホスト: ${room.hostName} | ${room.gameType === 'speed' ? '⚡スピード' : '🧠神経衰弱'}</div>
-          </div>
-          <div class="room-actions">
-            ${(!isFull || isHost) ? `<button onclick="joinRoom('${room.id}', false, '${room.pass}')">${isHost ? '再入室' : '参加'}</button>` : ''}
-            <button class="spectate-btn" onclick="joinRoom('${room.id}', true, '${room.pass}')">👀 観戦</button>
-            <button class="delete-btn" onclick="deleteRoomPrompt('${room.id}', '${room.pass}')">🗑️</button>
-          </div>
-        `;
-        roomsContainer.appendChild(item);
-      });
-    };
+  roomListEl.innerHTML = filteredRooms.map(room => `
+    <div class="room-item" onclick="joinRoom('${room.id}')">
+      <div>
+        <strong>${room.name || '無題の部屋'}</strong>
+        <span style="font-size: 11px; color: #aaa; margin-left: 5px;">(${room.gameType === 'speed' ? '⚡スピード' : '🧠神経衰弱'})</span>
+      </div>
+      <button style="padding: 3px 8px; font-size: 11px;">入室</button>
+    </div>
+  `).join('');
+};
 　　window.goToSignUp = () => {
   // 現在のトランプゲームのURLを取得してリダイレクト用にパラメータ付与
   const gameUrl = encodeURIComponent(window.location.href);
