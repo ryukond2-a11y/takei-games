@@ -474,53 +474,70 @@ function renderGame(room) {
       });
     }
 
-    async function onMemoryCardClick(index, room) {
-      if (isSpectator || room.status !== "playing" || room.turn !== currentUser.uid) return;
-      let cards = Array.isArray(room.cards) ? [...room.cards] : [];
-      if (!cards[index] || cards[index].flipped || cards[index].matched) return;
+   async function onMemoryCardClick(index, room) {
+  if (isSpectator || room.status !== "playing" || room.turn !== currentUser.uid) return;
+  let cards = Array.isArray(room.cards) ? [...room.cards] : [];
+  if (!cards[index] || cards[index].flipped || cards[index].matched) return;
 
-      cards[index].flipped = true;
-      const flippedCards = cards.filter(c => c.flipped && !c.matched);
-      await update(ref(db, `rooms/${currentRoomId}`), { cards: cards });
+  cards[index].flipped = true;
+  const flippedCards = cards.filter(c => c.flipped && !c.matched);
+  await update(ref(db, `rooms/${currentRoomId}`), { cards: cards });
 
-      if (flippedCards.length === 2) {
-        setTimeout(async () => {
-          let nextTurn = room.turn;
-          let scores = room.scores || {};
+  if (flippedCards.length === 2) {
+    setTimeout(async () => {
+      let nextTurn = room.turn;
+      let scores = room.scores || {};
 
-          if (flippedCards[0].num === flippedCards[1].num) {
-            cards.forEach(c => { if (c.flipped) c.matched = true; });
-            scores[currentUser.uid] = (scores[currentUser.uid] || 0) + 1;
-          } else {
-            cards.forEach(c => c.flipped = false);
-            nextTurn = room.host === currentUser.uid ? room.guest : room.host;
-          }
-
-          if (cards.every(c => c.matched)) {
-            const hScore = scores[room.host] || 0;
-            const gScore = scores[room.guest] || 0;
-            if (!gameEnded) {
-              gameEnded = true;
-              if (hScore > gScore) {
-                recordResult(room.host, room.guest);
-              } else if (gScore > hScore) {
-                recordResult(room.guest, room.host);
-              } else {
-                recordResult(room.host, room.guest, true);
-              }
-
-              showToast("🏆 試合終了！");
-              setTimeout(async () => {
-                await remove(ref(db, `rooms/${currentRoomId}`));
-              }, 2000);
-              return;
-            }
-          }
-
-          await update(ref(db, `rooms/${currentRoomId}`), { cards: cards, turn: nextTurn, scores: scores });
-        }, 800);
+      if (flippedCards[0].num === flippedCards[1].num) {
+        cards.forEach(c => { if (c.flipped) c.matched = true; });
+        scores[currentUser.uid] = (scores[currentUser.uid] || 0) + 1;
+      } else {
+        cards.forEach(c => c.flipped = false);
+        nextTurn = room.host === currentUser.uid ? room.guest : room.host;
       }
-    }
+
+      // 💡 ここからが全カード揃った時の勝敗判定・投稿処理です
+      if (cards.every(c => c.matched)) {
+        const hScore = scores[room.host] || 0;
+        const gScore = scores[room.guest] || 0;
+
+        if (!gameEnded) {
+          gameEnded = true;
+          const isHost = currentUser.uid === room.host;
+          const myScore = isHost ? hScore : gScore;
+          const oppScore = isHost ? gScore : hScore;
+          const oppName = isHost ? (room.guestName || 'ゲスト') : room.hostName;
+
+          // 自分の勝敗（win / lose / draw）を判定
+          let resultType = 'draw';
+          if (myScore > oppScore) resultType = 'win';
+          else if (myScore < oppScore) resultType = 'lose';
+
+          // 戦績の記録
+          if (hScore > gScore) recordResult(room.host, room.guest);
+          else if (gScore > hScore) recordResult(room.guest, room.host);
+          else recordResult(room.host, room.guest, true);
+
+          showToast("🏆 試合終了！");
+
+          // ✨ takei.net plus への投稿ポップアップを出す
+          setTimeout(() => {
+            if (confirm("🎉 試合が終了しました！ takei.net plus に結果を投稿しますか？")) {
+              shareGameResult('memory', resultType, oppName);
+            }
+          }, 500);
+
+          setTimeout(async () => {
+            await remove(ref(db, `rooms/${currentRoomId}`));
+          }, 2500);
+          return;
+        }
+      }
+
+      await update(ref(db, `rooms/${currentRoomId}`), { cards: cards, turn: nextTurn, scores: scores });
+    }, 800);
+  }
+}
 
     function renderSpeedBoard(room) {
       const container = document.getElementById("game-container");
