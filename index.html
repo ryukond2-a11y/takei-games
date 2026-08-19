@@ -322,13 +322,7 @@ window.renderRoomList = function() {
   const gameUrl = encodeURIComponent(window.location.href);
   window.location.href = `signup.html?redirect=${gameUrl}`;
 };
-    window.logout = async () => {
-  if (confirm("ログアウトしますか？")) {
-    if (currentRoomId) leaveRoom();
-    await signOut(auth);
-    showToast("ログアウトしました");
-  }
-};
+    window.logout = async (
     window.deleteRoomPrompt = async (roomId, roomPass) => {
       if (roomPass) {
         const inputPass = prompt("部屋削除用のパスワードを入力してください:");
