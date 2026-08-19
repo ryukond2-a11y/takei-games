@@ -679,19 +679,28 @@ function renderGame(room) {
           [`speedState/${isHost ? 'deck1' : 'deck2'}`]: myDeck
         };
 
-        if (myHand.length === 0 && !gameEnded) {
+       if (myHand.length === 0 && !gameEnded) {
           gameEnded = true;
           const winner = currentUser.uid;
           const loser = isHost ? room.guest : room.host;
+          const oppName = isHost ? (room.guestName || 'ゲスト') : room.hostName;
+
           recordResult(winner, loser);
 
           showToast("🎉 手札をすべて出し切りました！あなたの勝利です！");
+
+          // ✨ takei.net plus への投稿確認ポップアップを追加
+          setTimeout(() => {
+            if (confirm("🏆 勝利おめでとうございます！ takei.net plus に結果を投稿しますか？")) {
+              shareGameResult('speed', 'win', oppName);
+            }
+          }, 500);
+
           setTimeout(async () => {
             await remove(ref(db, `rooms/${currentRoomId}`));
-          }, 2000);
+          }, 2500);
           return;
         }
-
         await update(ref(db, `rooms/${currentRoomId}`), updates);
       }
     }
