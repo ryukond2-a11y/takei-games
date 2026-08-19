@@ -736,6 +736,33 @@
         showToast("手札・山札ともに出せるカードがありません");
       }
     };
+    // takei.net への投稿ページURL（実際の投稿画面URLに合わせて変更してください）
+const TAKEI_NET_SHARE_URL = "https://takei-net-itq0.onrender.com/index.html"; 
+
+// テキストを takei.net や Web Share API で共有する汎用関数
+window.shareToTakeiNet = (text) => {
+  const targetUrl = `${TAKEI_NET_SHARE_URL}?text=${encodeURIComponent(text)}`;
+  window.open(targetUrl, '_blank');
+};
+
+// Web Share API（スマホ標準の共有機能）またはクリップボードコピー
+window.shareGeneral = async (text, url = window.location.href) => {
+  if (navigator.share) {
+    try {
+      await navigator.share({
+        title: 'takei.net トランプゲーム',
+        text: text,
+        url: url
+      });
+    } catch (err) {
+      console.log("共有がキャンセルされました");
+    }
+  } else {
+    // Web Share未対応環境はクリップボードにコピー
+    navigator.clipboard.writeText(`${text}\n${url}`);
+    showToast("📋 共有リンクをクリップボードにコピーしました！");
+  }
+};
   </script>
 </head>
 <body>
